@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Jarvis</string>
+    <string name="app_name">Duq</string>
     <string name="settings">Settings</string>
     <string name="qr_code">QR Code</string>
     <string name="qr_code_hint">Enter 6-character code</string>
@@ -17,10 +17,10 @@
     <string name="status_error">Error</string>
     <string name="status_service_stopped">Service stopped</string>
     <string name="permission_required">Microphone permission required</string>
-    <string name="notification_title">Jarvis Listening</string>
-    <string name="notification_text">Say "Jarvis" to activate</string>
+    <string name="notification_title">Duq Listening</string>
+    <string name="notification_text">Say "Hey Duq" to activate</string>
     <string name="authenticated">Authenticated</string>
     <string name="not_authenticated">Not authenticated</string>
     <string name="logout">Logout</string>
-    <string name="accessibility_service_description">Jarvis uses accessibility service to maintain background voice detection. This allows the app to listen for the wake word even when the screen is off or when using other apps.</string>
+    <string name="accessibility_service_description">Duq uses accessibility service to maintain background voice detection. This allows the app to listen for the wake word even when the screen is off or when using other apps.</string>
 </resources>

@@ -1,5 +1,5 @@
 # ============================================================
-# ProGuard/R8 Rules for Jarvis Android
+# ProGuard/R8 Rules for Duq Android
 # ============================================================
 
 # -----------------------------------------------------------
@@ -73,8 +73,8 @@
 -keep class * implements com.google.gson.JsonSerializer
 -keep class * implements com.google.gson.JsonDeserializer
 # Keep API models (prevent field name obfuscation)
--keep class com.jarvis.android.network.ApiModels { *; }
--keep class com.jarvis.android.network.ApiModels$* { *; }
+-keep class com.duq.android.network.ApiModels { *; }
+-keep class com.duq.android.network.ApiModels$* { *; }
 
 # -----------------------------------------------------------
 # ROOM DATABASE
@@ -90,9 +90,9 @@
 # -----------------------------------------------------------
 # DATA MODELS (Prevent obfuscation of serialized fields)
 # -----------------------------------------------------------
--keep class com.jarvis.android.data.model.** { *; }
--keep class com.jarvis.android.data.local.entities.** { *; }
--keep class com.jarvis.android.network.** { *; }
+-keep class com.duq.android.data.model.** { *; }
+-keep class com.duq.android.data.local.entities.** { *; }
+-keep class com.duq.android.network.** { *; }
 
 # -----------------------------------------------------------
 # COMPOSE
@@ -139,4 +139,4 @@
 # -----------------------------------------------------------
 # ERROR HANDLING (Keep for crash reporting)
 # -----------------------------------------------------------
--keep class com.jarvis.android.error.** { *; }
+-keep class com.duq.android.error.** { *; }

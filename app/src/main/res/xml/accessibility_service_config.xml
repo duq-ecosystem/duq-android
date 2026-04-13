@@ -7,4 +7,4 @@
     android:canRetrieveWindowContent="false"
     android:notificationTimeout="100"
     android:description="@string/accessibility_service_description"
-    android:settingsActivity="com.jarvis.android.MainActivity" />
+    android:settingsActivity="com.duq.android.MainActivity" />

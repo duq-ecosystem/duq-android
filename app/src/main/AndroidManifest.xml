@@ -11,21 +11,21 @@
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
     <application
-        android:name=".JarvisApplication"
+        android:name=".DuqApplication"
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:networkSecurityConfig="@xml/network_security_config"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:theme="@style/Theme.JarvisAndroid"
+        android:theme="@style/Theme.DuqAndroid"
         tools:targetApi="34">
 
         <activity
             android:name=".MainActivity"
             android:exported="true"
             android:launchMode="singleTask"
-            android:theme="@style/Theme.JarvisAndroid">
+            android:theme="@style/Theme.DuqAndroid">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
@@ -37,7 +37,7 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data
-                    android:scheme="com.jarvis.android"
+                    android:scheme="com.duq.android"
                     android:host="oauth"
                     android:path="/callback" />
             </intent-filter>
@@ -48,7 +48,7 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data
-                    android:scheme="com.jarvis.android"
+                    android:scheme="com.duq.android"
                     android:host="oauth"
                     android:path="/logout" />
             </intent-filter>
@@ -60,13 +60,13 @@
             tools:node="remove" />
 
         <service
-            android:name=".service.JarvisListenerService"
+            android:name=".service.DuqListenerService"
             android:foregroundServiceType="microphone"
             android:exported="false" />
 
         <!-- Voice Interaction Service for system assistant role -->
         <service
-            android:name=".service.JarvisVoiceInteractionService"
+            android:name=".service.DuqVoiceInteractionService"
             android:permission="android.permission.BIND_VOICE_INTERACTION"
             android:exported="true">
             <meta-data
@@ -78,7 +78,7 @@
         </service>
 
         <service
-            android:name=".service.JarvisVoiceInteractionSessionService"
+            android:name=".service.DuqVoiceInteractionSessionService"
             android:permission="android.permission.BIND_VOICE_INTERACTION"
             android:exported="true" />
 
@@ -93,7 +93,7 @@
 
         <!-- Accessibility Service for background operation on MIUI -->
         <service
-            android:name=".service.JarvisAccessibilityService"
+            android:name=".service.DuqAccessibilityService"
             android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
             android:exported="true">
             <intent-filter>

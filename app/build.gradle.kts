@@ -8,7 +8,7 @@ plugins {
 }
 
 android {
-    namespace = "com.jarvis.android"
+    namespace = "com.duq.android"
     compileSdk = 34
 
     // Release signing configuration
@@ -34,7 +34,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.jarvis.android"
+        applicationId = "com.duq.android"
         minSdk = 26
         targetSdk = 34
         versionCode = 1
@@ -46,13 +46,13 @@ android {
         }
 
         // AppAuth redirect scheme
-        manifestPlaceholders["appAuthRedirectScheme"] = "com.jarvis.android"
+        manifestPlaceholders["appAuthRedirectScheme"] = "com.duq.android"
 
         // API Configuration (can be overridden per flavor/buildType)
         buildConfigField("String", "API_BASE_URL", "\"https://on-za-menya.online\"")
         buildConfigField("String", "KEYCLOAK_URL", "\"https://on-za-menya.online\"")
-        buildConfigField("String", "KEYCLOAK_REALM", "\"jarvis\"")
-        buildConfigField("String", "KEYCLOAK_CLIENT_ID", "\"jarvis-android\"")
+        buildConfigField("String", "KEYCLOAK_REALM", "\"duq\"")
+        buildConfigField("String", "KEYCLOAK_CLIENT_ID", "\"duq-android\"")
     }
 
     buildTypes {

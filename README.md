@@ -1,13 +1,13 @@
-# Jarvis Android
+# Duq Android
 
 > Voice-controlled AI assistant for Android with Keycloak SSO
 
-Mobile client for Jarvis AI with wake word detection, voice activity detection, and automatic cross-channel synchronization with Telegram.
+Mobile client for Duq AI with wake word detection, voice activity detection, and automatic cross-channel synchronization with Telegram.
 
 ## Features
 
 - 🔐 **Keycloak SSO** - Single Sign-On authentication via OIDC
-- 🎤 **Wake Word Detection** - "JARVIS" using Porcupine (sensitivity: 0.5f)
+- 🎤 **Wake Word Detection** - "Hey Duq" using Porcupine (sensitivity: 0.5f)
 - 🗣️ **Voice Activity Detection** - Silero VAD with 2s silence timeout
 - 💬 **Unified Conversations** - Shared history between Mobile and Telegram
 - 🔄 **Auto-Sync** - Messages automatically appear in Telegram
@@ -27,8 +27,8 @@ Mobile client for Jarvis AI with wake word detection, voice activity detection, 
 
 1. Clone repository:
    ```bash
-   git clone https://github.com/Danny-sth/vtoroy-android.git jarvis-android
-   cd jarvis-android
+   git clone https://github.com/Danny-sth/duq-android.git duq-android
+   cd duq-android
    ```
 
 2. Build APK:
@@ -51,11 +51,11 @@ Mobile client for Jarvis AI with wake word detection, voice activity detection, 
 
 ```bash
 # Set Porcupine key via ADB (for testing)
-adb shell am start -n com.jarvis.android/.MainActivity \
+adb shell am start -n com.duq.android/.MainActivity \
   --es porcupine_key "YOUR_PORCUPINE_KEY"
 
 # View logs
-adb logcat -s JarvisListenerService:D WakeWordManager:D KeycloakAuthManager:D
+adb logcat -s DuqListenerService:D WakeWordManager:D KeycloakAuthManager:D
 ```
 
 ## Authentication
@@ -71,9 +71,9 @@ The app uses **Keycloak OIDC** for authentication via the AppAuth library:
 
 ### Keycloak Configuration
 
-Keycloak client (`jarvis-android`):
+Keycloak client (`duq-android`):
 - **Client Type**: Public
-- **Redirect URI**: `com.jarvis.android://oauth/callback`
+- **Redirect URI**: `com.duq.android://oauth/callback`
 - **PKCE**: Required (S256)
 
 ### Token Storage
@@ -87,9 +87,9 @@ Tokens stored securely in Android DataStore:
 ## Architecture
 
 ```
-Wake Word (Porcupine "JARVIS")
+Wake Word (Porcupine "Hey Duq")
        ↓
-JarvisListenerService (foreground)
+DuqListenerService (foreground)
        ↓
 VoiceCommandProcessor
        ↓
@@ -113,7 +113,7 @@ Keycloak login page (90.156.230.49:8180)
        ↓
 User authenticates
        ↓
-Redirect: com.jarvis.android://oauth/callback
+Redirect: com.duq.android://oauth/callback
        ↓
 AppAuth receives authorization code
        ↓
@@ -123,13 +123,13 @@ Store tokens in DataStore
        ↓
 Fetch user info from Keycloak
        ↓
-Ready to use Jarvis!
+Ready to use Duq!
 ```
 
 ### Data Sync
 
 ```
-Mobile App → jarvis-gateway → PostgreSQL (source of truth)
+Mobile App → duq-gateway → PostgreSQL (source of truth)
                                     ↓
                     ┌───────────────┴──────────────┐
                     ▼                              ▼
@@ -141,7 +141,7 @@ Mobile App → jarvis-gateway → PostgreSQL (source of truth)
 
 **Features:**
 - 📱 Mobile messages → Telegram: `*[Mobile App]*\n\n{text}`
-- 🤖 Assistant responses → Telegram: `*[Jarvis]*\n\n{response}`
+- 🤖 Assistant responses → Telegram: `*[Duq]*\n\n{response}`
 - 🔄 Pull-on-focus: app loads latest messages when gaining foreground
 - ⚡ Reactive UI: Room Flow auto-updates when new messages arrive
 
@@ -163,14 +163,14 @@ Mobile App → jarvis-gateway → PostgreSQL (source of truth)
 ## Project Structure
 
 ```
-app/src/main/java/com/jarvis/android/
+app/src/main/java/com/duq/android/
 ├── auth/                     # Keycloak OIDC
 │   ├── KeycloakConfig.kt     # Keycloak URLs, client config
 │   └── KeycloakAuthManager.kt # Auth flow, token management
-├── service/                  # JarvisListenerService, VoiceCommandProcessor
+├── service/                  # DuqListenerService, VoiceCommandProcessor
 ├── wakeword/                 # Porcupine WakeWordManager
 ├── audio/                    # AudioRecorder, AudioPlayer, VAD
-├── network/                  # JarvisApiClient + API models
+├── network/                  # DuqApiClient + API models
 ├── data/                     # Repositories, Room DB, models
 │   ├── SettingsRepository.kt # Token storage
 │   ├── ConversationRepository.kt
@@ -187,7 +187,7 @@ app/src/main/java/com/jarvis/android/
 
 ## API Integration
 
-**Backend**: `https://on-za-menya.online` (jarvis-gateway)
+**Backend**: `https://on-za-menya.online` (duq-gateway)
 **Auth**: Keycloak JWT in Authorization header
 
 ### Endpoints
@@ -217,7 +217,7 @@ Response: { id, userId, title, startedAt }
 
 Backend automatically syncs Mobile messages to Telegram:
 - User message: `📱 *[Mobile App]*\n\n{command}`
-- Assistant response: `🤖 *[Jarvis]*\n\n{response}`
+- Assistant response: `🤖 *[Duq]*\n\n{response}`
 - Commands: `/history [N]` - view last N messages
 
 ## Development
@@ -245,16 +245,16 @@ Backend automatically syncs Mobile messages to Telegram:
 adb logcat -s KeycloakAuthManager:D SettingsRepository:D
 
 # Voice pipeline logs
-adb logcat -s WakeWordManager:D VoiceActivityDetector:D JarvisApiClient:D
+adb logcat -s WakeWordManager:D VoiceActivityDetector:D DuqApiClient:D
 
 # All app logs
-adb logcat | grep -E "Jarvis|WakeWord|VoiceActivity|ApiClient|Keycloak"
+adb logcat | grep -E "Duq|WakeWord|VoiceActivity|ApiClient|Keycloak"
 
 # Conversation sync logs
 adb logcat -s ConversationViewModel:D ConversationRepository:D
 
 # Clear app data
-adb shell pm clear com.jarvis.android
+adb shell pm clear com.duq.android
 ```
 
 ### Testing
@@ -267,7 +267,7 @@ adb shell pm clear com.jarvis.android
 
 #### Manual Test: Voice Command
 1. Open app
-2. Say "JARVIS"
+2. Say "Hey Duq"
 3. Say command (e.g., "What's the weather?")
 4. Check Telegram for auto-synced messages
 
@@ -284,8 +284,8 @@ adb shell pm clear com.jarvis.android
 Update `auth/KeycloakConfig.kt`:
 ```kotlin
 const val KEYCLOAK_URL = "http://90.156.230.49:8180"
-const val REALM = "jarvis"
-const val CLIENT_ID = "jarvis-android"
+const val REALM = "duq"
+const val CLIENT_ID = "duq-android"
 ```
 
 ### Wake Word Sensitivity
@@ -305,15 +305,15 @@ private val silenceTimeoutMs = 2000L  // milliseconds
 ## Troubleshooting
 
 ### Login fails
-- Check Keycloak server is accessible: `curl http://90.156.230.49:8180/realms/jarvis`
-- Verify `jarvis-android` client exists in Keycloak
-- Check redirect URI matches: `com.jarvis.android://oauth/callback`
+- Check Keycloak server is accessible: `curl http://90.156.230.49:8180/realms/duq`
+- Verify `duq-android` client exists in Keycloak
+- Check redirect URI matches: `com.duq.android://oauth/callback`
 - Check logs: `adb logcat -s KeycloakAuthManager:D`
 
 ### Token expired / 401 errors
 - App should auto-refresh tokens
 - If fails, logout and re-login
-- Check logs: `adb logcat -s JarvisApiClient:D`
+- Check logs: `adb logcat -s DuqApiClient:D`
 
 ### Wake word not detected
 - Check Porcupine API key is valid
@@ -360,8 +360,8 @@ Private project - © 2026 Danny-sth
 
 ## Related Projects
 
-- [jarvis-gateway](https://github.com/Danny-sth/jarvis-gateway) - Backend API gateway
-- [not-that-jarvis](https://github.com/Danny-sth/not-that-jarvis) - Core AI agent
+- [duq-gateway](https://github.com/Danny-sth/duq-gateway) - Backend API gateway
+- [not-that-duq](https://github.com/Danny-sth/not-that-duq) - Core AI agent
 
 ## Support
 
