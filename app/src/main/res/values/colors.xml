@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Iron Man Color Palette -->
+    <color name="iron_man_red">#E62429</color>
+    <color name="iron_man_red_light">#FF3B3B</color>
+    <color name="iron_man_red_dark">#8B1517</color>
+    <color name="iron_man_gold">#FFD700</color>
+    <color name="background_black">#0D0D0D</color>
+    <color name="surface_gray">#1A1A1A</color>
+    <color name="surface_variant">#252525</color>
+
+    <!-- Launcher icon background -->
+    <color name="ic_launcher_background">#0D0D0D</color>
+</resources>

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.JarvisAndroid" parent="android:Theme.Material.NoActionBar">
+        <item name="android:statusBarColor">@color/background_black</item>
+        <item name="android:navigationBarColor">@color/background_black</item>
+        <item name="android:windowBackground">@color/background_black</item>
+        <item name="android:colorPrimary">@color/iron_man_red</item>
+        <item name="android:colorAccent">@color/iron_man_red_light</item>
+    </style>
+</resources>

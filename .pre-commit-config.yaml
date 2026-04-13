@@ -1,0 +1,58 @@
+# Pre-commit hooks for jarvis-android
+# Install: pip install pre-commit && pre-commit install
+
+repos:
+  # Kotlin formatting with ktlint
+  - repo: https://github.com/JLLeitschuh/ktlint-gradle
+    rev: 12.1.0
+    hooks:
+      - id: ktlint
+        name: ktlint format check
+        entry: ./gradlew ktlintCheck
+        language: system
+        types: [kotlin]
+        pass_filenames: false
+
+  # Gradle build check
+  - repo: local
+    hooks:
+      - id: gradle-check
+        name: gradle check
+        entry: ./gradlew check --no-daemon -q
+        language: system
+        types: [kotlin]
+        pass_filenames: false
+
+      - id: gradle-lint
+        name: android lint
+        entry: ./gradlew lintDebug --no-daemon -q
+        language: system
+        types: [kotlin]
+        pass_filenames: false
+        stages: [push]  # Only on push, not on every commit
+
+  # General file checks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: \.gradle$
+      - id: end-of-file-fixer
+        exclude: \.gradle$
+      - id: check-yaml
+      - id: check-added-large-files
+        args: [--maxkb=2000]  # Allow larger files for Android resources
+      - id: check-merge-conflict
+
+  # XML formatting for Android resources
+  - repo: local
+    hooks:
+      - id: check-xml
+        name: check xml formatting
+        entry: python -c "import xml.etree.ElementTree as ET; import sys; [ET.parse(f) for f in sys.argv[1:]]"
+        language: system
+        types: [xml]
+
+# CI configuration
+ci:
+  skip: [gradle-check, gradle-lint]  # These run in CI pipeline
