@@ -123,8 +123,8 @@ class SettingsRepository(private val context: Context) {
 
     val hasValidSettings: Flow<Boolean> = flow {
         val token = encryptedPrefs.getString(KEY_ACCESS_TOKEN, "") ?: ""
-        val apiKey = context.dataStore.data.first()[PreferencesKeys.PORCUPINE_API_KEY] ?: ""
-        emit(token.isNotBlank() && apiKey.isNotBlank())
+        // Only require authentication, Porcupine key is optional
+        emit(token.isNotBlank())
     }
 
     /**

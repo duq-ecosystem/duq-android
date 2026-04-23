@@ -1,16 +1,16 @@
 package com.duq.android.ui
 
-import android.app.Activity
-import android.content.Intent
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.duq.android.R
@@ -29,69 +29,16 @@ fun SettingsScreen(onSettingsSaved: () -> Unit) {
     val savedAccessToken by settingsRepository.accessToken.collectAsState(initial = "")
     val savedUsername by settingsRepository.username.collectAsState(initial = "")
     val savedUserEmail by settingsRepository.userEmail.collectAsState(initial = "")
-    val savedApiKey by settingsRepository.porcupineApiKey.collectAsState(initial = "")
 
-    var porcupineApiKey by remember { mutableStateOf("") }
     var isAuthenticating by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var successMessage by remember { mutableStateOf<String?>(null) }
 
+    // Direct login fields
+    var usernameInput by remember { mutableStateOf("") }
+    var passwordInput by remember { mutableStateOf("") }
+
     val isAuthenticated = savedAccessToken.isNotBlank()
-
-    // OAuth result launcher
-    val authLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.StartActivityForResult()
-    ) { result ->
-        // AppAuth may return with result code 0 (not RESULT_OK), but with valid data
-        val data = result.data
-        if (data != null) {
-            scope.launch {
-                isAuthenticating = true
-                errorMessage = null
-
-                keycloakAuthManager.handleAuthorizationResponse(
-                    intent = data,
-                    onSuccess = { accessToken, refreshToken, idToken, expiresAt ->
-                        settingsRepository.saveAuthTokens(
-                            accessToken = accessToken,
-                            refreshToken = refreshToken,
-                            idToken = idToken,
-                            expiresAt = expiresAt
-                        )
-
-                        // Get user info
-                        val userInfoResult = keycloakAuthManager.getUserInfo(accessToken)
-                        userInfoResult.getOrNull()?.let { userInfo ->
-                            settingsRepository.saveUserInfo(
-                                sub = userInfo.sub,
-                                email = userInfo.email,
-                                name = userInfo.name,
-                                username = userInfo.preferredUsername
-                            )
-                        }
-
-                        successMessage = "Authenticated successfully!"
-                        isAuthenticating = false
-                    },
-                    onError = { error ->
-                        errorMessage = error
-                        isAuthenticating = false
-                    }
-                )
-            }
-        } else {
-            isAuthenticating = false
-            if (result.resultCode == Activity.RESULT_CANCELED) {
-                errorMessage = "Login cancelled"
-            }
-        }
-    }
-
-    LaunchedEffect(savedApiKey) {
-        if (porcupineApiKey.isEmpty() && savedApiKey.isNotEmpty()) {
-            porcupineApiKey = savedApiKey
-        }
-    }
 
     DisposableEffect(Unit) {
         onDispose {
@@ -153,23 +100,133 @@ fun SettingsScreen(onSettingsSaved: () -> Unit) {
             Spacer(modifier = Modifier.height(24.dp))
 
             if (!isAuthenticated) {
-                // Keycloak Login Button
+                // Username field
+                OutlinedTextField(
+                    value = usernameInput,
+                    onValueChange = { usernameInput = it },
+                    label = { Text("Username") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    enabled = !isAuthenticating,
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Text,
+                        imeAction = ImeAction.Next
+                    )
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Password field
+                OutlinedTextField(
+                    value = passwordInput,
+                    onValueChange = { passwordInput = it },
+                    label = { Text("Password") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    enabled = !isAuthenticating,
+                    visualTransformation = PasswordVisualTransformation(),
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Password,
+                        imeAction = ImeAction.Done
+                    ),
+                    keyboardActions = KeyboardActions(
+                        onDone = {
+                            if (usernameInput.isNotBlank() && passwordInput.isNotBlank()) {
+                                scope.launch {
+                                    isAuthenticating = true
+                                    errorMessage = null
+                                    successMessage = null
+
+                                    val result = keycloakAuthManager.loginWithPassword(
+                                        username = usernameInput.trim(),
+                                        password = passwordInput
+                                    )
+
+                                    result.fold(
+                                        onSuccess = { tokenResponse ->
+                                            settingsRepository.saveAuthTokens(
+                                                accessToken = tokenResponse.accessToken,
+                                                refreshToken = tokenResponse.refreshToken,
+                                                idToken = tokenResponse.idToken,
+                                                expiresAt = tokenResponse.expiresAt
+                                            )
+
+                                            // Get user info
+                                            val userInfoResult = keycloakAuthManager.getUserInfo(tokenResponse.accessToken)
+                                            userInfoResult.getOrNull()?.let { userInfo ->
+                                                settingsRepository.saveUserInfo(
+                                                    sub = userInfo.sub,
+                                                    email = userInfo.email,
+                                                    name = userInfo.name,
+                                                    username = userInfo.preferredUsername
+                                                )
+                                            }
+
+                                            successMessage = "Authenticated successfully!"
+                                            isAuthenticating = false
+                                            passwordInput = ""
+                                            onSettingsSaved()
+                                        },
+                                        onFailure = { error ->
+                                            errorMessage = error.message ?: "Login failed"
+                                            isAuthenticating = false
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                    )
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Login Button
                 Button(
                     onClick = {
-                        isAuthenticating = true
-                        errorMessage = null
-                        successMessage = null
+                        scope.launch {
+                            isAuthenticating = true
+                            errorMessage = null
+                            successMessage = null
 
-                        try {
-                            val authIntent = keycloakAuthManager.getAuthorizationIntent()
-                            authLauncher.launch(authIntent)
-                        } catch (e: Exception) {
-                            errorMessage = "Failed to start login: ${e.message}"
-                            isAuthenticating = false
+                            val result = keycloakAuthManager.loginWithPassword(
+                                username = usernameInput.trim(),
+                                password = passwordInput
+                            )
+
+                            result.fold(
+                                onSuccess = { tokenResponse ->
+                                    settingsRepository.saveAuthTokens(
+                                        accessToken = tokenResponse.accessToken,
+                                        refreshToken = tokenResponse.refreshToken,
+                                        idToken = tokenResponse.idToken,
+                                        expiresAt = tokenResponse.expiresAt
+                                    )
+
+                                    // Get user info
+                                    val userInfoResult = keycloakAuthManager.getUserInfo(tokenResponse.accessToken)
+                                    userInfoResult.getOrNull()?.let { userInfo ->
+                                        settingsRepository.saveUserInfo(
+                                            sub = userInfo.sub,
+                                            email = userInfo.email,
+                                            name = userInfo.name,
+                                            username = userInfo.preferredUsername
+                                        )
+                                    }
+
+                                    successMessage = "Authenticated successfully!"
+                                    isAuthenticating = false
+                                    passwordInput = ""
+                                    onSettingsSaved()
+                                },
+                                onFailure = { error ->
+                                    errorMessage = error.message ?: "Login failed"
+                                    isAuthenticating = false
+                                }
+                            )
                         }
                     },
                     modifier = Modifier.fillMaxWidth(),
-                    enabled = !isAuthenticating
+                    enabled = !isAuthenticating && usernameInput.isNotBlank() && passwordInput.isNotBlank()
                 ) {
                     if (isAuthenticating) {
                         CircularProgressIndicator(
@@ -177,9 +234,9 @@ fun SettingsScreen(onSettingsSaved: () -> Unit) {
                             color = MaterialTheme.colorScheme.onPrimary
                         )
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Authenticating...")
+                        Text("Logging in...")
                     } else {
-                        Text("Login with Keycloak")
+                        Text("Login")
                     }
                 }
 
@@ -219,47 +276,6 @@ fun SettingsScreen(onSettingsSaved: () -> Unit) {
                 }
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
-            HorizontalDivider()
-            Spacer(modifier = Modifier.height(24.dp))
-
-            // Porcupine API Key
-            Text(
-                text = "Wake Word Settings",
-                style = MaterialTheme.typography.titleMedium
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-
-            OutlinedTextField(
-                value = porcupineApiKey,
-                onValueChange = { porcupineApiKey = it },
-                label = { Text(stringResource(R.string.porcupine_api_key)) },
-                placeholder = { Text(stringResource(R.string.porcupine_api_key_hint)) },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                visualTransformation = PasswordVisualTransformation()
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = "Get free API key at console.picovoice.ai",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            Button(
-                onClick = {
-                    scope.launch {
-                        settingsRepository.savePorcupineApiKey(porcupineApiKey)
-                        onSettingsSaved()
-                    }
-                },
-                modifier = Modifier.fillMaxWidth(),
-                enabled = porcupineApiKey.isNotBlank()
-            ) {
-                Text(stringResource(R.string.save))
-            }
         }
     }
 }

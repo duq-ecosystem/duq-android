@@ -6,104 +6,70 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.unit.dp
 import com.duq.android.DuqState
-import kotlin.math.cos
-import kotlin.math.sin
+import com.duq.android.ui.theme.DuqColors
 
-// State-based color palettes
-private object ArcReactorColors {
-    // IDLE - Iron Man Red
-    val idleCore = Color(0xFFE62429)
-    val idleGlow = Color(0xFFFF3B3B)
-    val idleDim = Color(0xFF8B1517)
-
-    // LISTENING - Cyan Blue (active listening)
-    val listeningCore = Color(0xFF00D4FF)
-    val listeningGlow = Color(0xFF00F5FF)
-    val listeningDim = Color(0xFF006B80)
-
-    // PROCESSING - Orange/Gold (thinking)
-    val processingCore = Color(0xFFFF9500)
-    val processingGlow = Color(0xFFFFB340)
-    val processingDim = Color(0xFF805000)
-
-    // PLAYING - Green (speaking)
-    val playingCore = Color(0xFF00E676)
-    val playingGlow = Color(0xFF69F0AE)
-    val playingDim = Color(0xFF00733D)
-
-    // ERROR - Deep Red (error)
-    val errorCore = Color(0xFF660000)
-    val errorGlow = Color(0xFF990000)
-    val errorDim = Color(0xFF330000)
-}
-
+/**
+ * DuqOrb - A clean, modern visualization of Duq's state.
+ * Replaces the Iron Man Arc Reactor with an elegant pulsing orb.
+ */
 @Composable
 fun ArcReactor(
     state: DuqState?,
     modifier: Modifier = Modifier
 ) {
-    // Get colors based on state
-    val (coreColor, glowColor, dimColor) = when (state) {
-        DuqState.IDLE -> Triple(ArcReactorColors.idleCore, ArcReactorColors.idleGlow, ArcReactorColors.idleDim)
-        DuqState.LISTENING, DuqState.RECORDING -> Triple(ArcReactorColors.listeningCore, ArcReactorColors.listeningGlow, ArcReactorColors.listeningDim)
-        DuqState.PROCESSING -> Triple(ArcReactorColors.processingCore, ArcReactorColors.processingGlow, ArcReactorColors.processingDim)
-        DuqState.PLAYING -> Triple(ArcReactorColors.playingCore, ArcReactorColors.playingGlow, ArcReactorColors.playingDim)
-        DuqState.ERROR -> Triple(ArcReactorColors.errorCore, ArcReactorColors.errorGlow, ArcReactorColors.errorDim)
-        null -> Triple(ArcReactorColors.idleDim, ArcReactorColors.idleDim, ArcReactorColors.idleDim)
+    // Get color based on state
+    val targetColor = when (state) {
+        DuqState.IDLE -> DuqColors.idle
+        DuqState.LISTENING, DuqState.RECORDING -> DuqColors.listening
+        DuqState.PROCESSING -> DuqColors.processing
+        DuqState.PLAYING -> DuqColors.speaking
+        DuqState.ERROR -> DuqColors.errorState
+        null -> DuqColors.textTertiary
     }
 
-    // Animate color transitions
-    val animatedCore by animateColorAsState(
-        targetValue = coreColor,
-        animationSpec = tween(300),
-        label = "coreColor"
-    )
-    val animatedGlow by animateColorAsState(
-        targetValue = glowColor,
-        animationSpec = tween(300),
-        label = "glowColor"
-    )
-    val animatedDim by animateColorAsState(
-        targetValue = dimColor,
-        animationSpec = tween(300),
-        label = "dimColor"
+    // Animate color transitions smoothly
+    val animatedColor by animateColorAsState(
+        targetValue = targetColor,
+        animationSpec = tween(400, easing = FastOutSlowInEasing),
+        label = "orbColor"
     )
 
-    val infiniteTransition = rememberInfiniteTransition(label = "pulse")
+    val infiniteTransition = rememberInfiniteTransition(label = "orbAnimation")
 
+    // Pulse speed based on state
     val pulseSpeed = when (state) {
-        DuqState.LISTENING, DuqState.RECORDING -> 400
-        DuqState.PROCESSING -> 200
-        DuqState.PLAYING -> 600
-        DuqState.ERROR -> 150
-        else -> 2000
+        DuqState.LISTENING, DuqState.RECORDING -> 800
+        DuqState.PROCESSING -> 400
+        DuqState.PLAYING -> 1000
+        DuqState.ERROR -> 300
+        else -> 2500
     }
 
-    val pulseAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.5f,
+    // Breathing/pulse animation
+    val breathe by infiniteTransition.animateFloat(
+        initialValue = 0.85f,
         targetValue = 1f,
         animationSpec = infiniteRepeatable(
             animation = tween(pulseSpeed, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
         ),
-        label = "pulseAlpha"
+        label = "breathe"
     )
 
-    val rotationAngle by infiniteTransition.animateFloat(
+    // Rotation for processing state
+    val rotation by infiniteTransition.animateFloat(
         initialValue = 0f,
         targetValue = 360f,
         animationSpec = infiniteRepeatable(
             animation = tween(
-                durationMillis = if (state == DuqState.PROCESSING) 1000 else 3000,
+                durationMillis = if (state == DuqState.PROCESSING) 1500 else 8000,
                 easing = LinearEasing
             ),
             repeatMode = RepeatMode.Restart
@@ -111,101 +77,124 @@ fun ArcReactor(
         label = "rotation"
     )
 
-    val scale by infiniteTransition.animateFloat(
-        initialValue = 1f,
-        targetValue = when (state) {
-            DuqState.LISTENING, DuqState.RECORDING -> 1.08f
-            DuqState.PLAYING -> 1.05f
-            else -> 1f
-        },
+    // Secondary ring pulse
+    val ringPulse by infiniteTransition.animateFloat(
+        initialValue = 0.6f,
+        targetValue = 1f,
         animationSpec = infiniteRepeatable(
-            animation = tween(pulseSpeed, easing = FastOutSlowInEasing),
+            animation = tween(pulseSpeed * 2, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
         ),
-        label = "scale"
+        label = "ringPulse"
     )
 
     val isActive = state != null && state != DuqState.ERROR
-    val isProcessing = state == DuqState.PROCESSING
 
-    Canvas(modifier = modifier.size(200.dp)) {
+    Canvas(modifier = modifier.size(180.dp)) {
         val center = Offset(size.width / 2, size.height / 2)
         val radius = size.minDimension / 2
 
-        // Outer glow
-        if (state != null) {
-            drawCircle(
-                brush = Brush.radialGradient(
-                    colors = listOf(
-                        animatedGlow.copy(alpha = pulseAlpha * 0.4f),
-                        Color.Transparent
-                    ),
-                    center = center,
-                    radius = radius * 1.3f
+        // Outer glow - soft ambient
+        drawCircle(
+            brush = Brush.radialGradient(
+                colors = listOf(
+                    animatedColor.copy(alpha = 0.15f * breathe),
+                    animatedColor.copy(alpha = 0.05f),
+                    Color.Transparent
                 ),
-                radius = radius * 1.3f,
-                center = center
+                center = center,
+                radius = radius * 1.4f
+            ),
+            radius = radius * 1.4f,
+            center = center
+        )
+
+        // Outer ring - thin elegant line
+        rotate(rotation * 0.3f, center) {
+            drawCircle(
+                color = animatedColor.copy(alpha = 0.3f * ringPulse),
+                radius = radius * 0.92f,
+                center = center,
+                style = Stroke(width = 1.dp.toPx())
             )
         }
 
-        // Main outer ring
-        drawCircle(
-            color = animatedDim.copy(alpha = 0.8f),
-            radius = radius * 0.95f,
-            center = center,
-            style = Stroke(width = 4.dp.toPx())
-        )
+        // Middle ring with dash pattern (for processing)
+        if (state == DuqState.PROCESSING) {
+            rotate(rotation, center) {
+                val dashCount = 12
+                val dashAngle = 360f / dashCount
+                val dashSweep = dashAngle * 0.4f
 
-        // Secondary ring with segments
-        if (isProcessing) {
-            rotate(rotationAngle, center) {
-                drawArcSegments(center, radius * 0.85f, animatedGlow.copy(alpha = pulseAlpha))
+                for (i in 0 until dashCount) {
+                    drawArc(
+                        color = animatedColor.copy(alpha = 0.8f),
+                        startAngle = i * dashAngle - 90f,
+                        sweepAngle = dashSweep,
+                        useCenter = false,
+                        topLeft = Offset(center.x - radius * 0.75f, center.y - radius * 0.75f),
+                        size = androidx.compose.ui.geometry.Size(radius * 1.5f, radius * 1.5f),
+                        style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round)
+                    )
+                }
             }
         } else {
-            drawArcSegments(center, radius * 0.85f, animatedCore.copy(alpha = if (isActive) pulseAlpha else 0.5f))
+            // Static ring when not processing
+            drawCircle(
+                color = animatedColor.copy(alpha = 0.2f),
+                radius = radius * 0.75f,
+                center = center,
+                style = Stroke(width = 1.5f.dp.toPx())
+            )
         }
 
-        // Inner ring
-        drawCircle(
-            color = if (isActive) animatedCore else animatedDim.copy(alpha = 0.4f),
-            radius = radius * 0.65f,
-            center = center,
-            style = Stroke(width = 3.dp.toPx())
-        )
-
-        // Triangular elements
-        if (isProcessing) {
-            rotate(rotationAngle * 0.7f, center) {
-                drawTriangularElements(center, radius * 0.75f, animatedGlow.copy(alpha = pulseAlpha))
-            }
-        } else {
-            drawTriangularElements(center, radius * 0.75f, animatedCore.copy(alpha = if (isActive) 0.8f else 0.3f))
-        }
-
-        // Core circle with gradient
-        val coreRadius = radius * 0.35f * scale
+        // Inner core - the main orb
+        val coreRadius = radius * 0.45f * breathe
         drawCircle(
             brush = Brush.radialGradient(
                 colors = if (isActive) {
-                    listOf(animatedGlow.copy(alpha = pulseAlpha), animatedCore, animatedDim)
+                    listOf(
+                        animatedColor.copy(alpha = 0.9f),
+                        animatedColor.copy(alpha = 0.6f),
+                        animatedColor.copy(alpha = 0.2f)
+                    )
                 } else {
-                    listOf(animatedDim.copy(alpha = 0.5f), Color(0xFF1A0A0A))
+                    listOf(
+                        animatedColor.copy(alpha = 0.4f),
+                        animatedColor.copy(alpha = 0.2f),
+                        Color.Transparent
+                    )
                 },
                 center = center,
-                radius = coreRadius
+                radius = coreRadius * 1.2f
             ),
             radius = coreRadius,
             center = center
         )
 
-        // Inner core highlight
+        // Core highlight - adds depth
         if (isActive) {
             drawCircle(
-                color = Color.White.copy(alpha = pulseAlpha * 0.4f),
-                radius = coreRadius * 0.3f,
-                center = center
+                brush = Brush.radialGradient(
+                    colors = listOf(
+                        Color.White.copy(alpha = 0.5f * breathe),
+                        Color.White.copy(alpha = 0.1f),
+                        Color.Transparent
+                    ),
+                    center = Offset(center.x - coreRadius * 0.2f, center.y - coreRadius * 0.2f),
+                    radius = coreRadius * 0.6f
+                ),
+                radius = coreRadius * 0.5f,
+                center = Offset(center.x - coreRadius * 0.15f, center.y - coreRadius * 0.15f)
             )
         }
+
+        // Innermost dot - the "eye"
+        drawCircle(
+            color = if (isActive) Color.White.copy(alpha = 0.9f * breathe) else animatedColor.copy(alpha = 0.3f),
+            radius = radius * 0.08f,
+            center = center
+        )
     }
 }
 
@@ -220,45 +209,4 @@ private fun animateColorAsState(
         animationSpec = animationSpec,
         label = label
     )
-}
-
-private fun DrawScope.drawArcSegments(center: Offset, radius: Float, color: Color) {
-    val segmentCount = 8
-    val gapAngle = 8f
-    val segmentAngle = (360f / segmentCount) - gapAngle
-
-    for (i in 0 until segmentCount) {
-        val startAngle = i * (360f / segmentCount) - 90f
-        drawArc(
-            color = color,
-            startAngle = startAngle,
-            sweepAngle = segmentAngle,
-            useCenter = false,
-            topLeft = Offset(center.x - radius, center.y - radius),
-            size = Size(radius * 2, radius * 2),
-            style = Stroke(width = 6f, cap = StrokeCap.Round)
-        )
-    }
-}
-
-private fun DrawScope.drawTriangularElements(center: Offset, radius: Float, color: Color) {
-    val count = 3
-    for (i in 0 until count) {
-        val angle = Math.toRadians((i * 120.0) - 90.0)
-        val innerRadius = radius * 0.5f
-        val outerRadius = radius * 0.7f
-
-        val innerX = center.x + innerRadius * cos(angle).toFloat()
-        val innerY = center.y + innerRadius * sin(angle).toFloat()
-        val outerX = center.x + outerRadius * cos(angle).toFloat()
-        val outerY = center.y + outerRadius * sin(angle).toFloat()
-
-        drawLine(
-            color = color,
-            start = Offset(innerX, innerY),
-            end = Offset(outerX, outerY),
-            strokeWidth = 4f,
-            cap = StrokeCap.Round
-        )
-    }
 }

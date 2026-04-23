@@ -14,8 +14,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.duq.android.data.model.Message
+import com.duq.android.ui.theme.DuqColors
 
 @Composable
 fun MessagesList(
@@ -34,10 +37,17 @@ fun MessagesList(
 
     Box(modifier = modifier.fillMaxSize()) {
         if (isLoading && messages.isEmpty()) {
-            CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+            CircularProgressIndicator(
+                modifier = Modifier.align(Alignment.Center),
+                color = DuqColors.primary
+            )
         } else if (messages.isEmpty()) {
             Text(
                 text = "No messages yet\nSay \"Hey Duq\" to start",
+                color = DuqColors.textTertiary,
+                fontSize = 14.sp,
+                textAlign = TextAlign.Center,
+                lineHeight = 22.sp,
                 modifier = Modifier
                     .align(Alignment.Center)
                     .padding(16.dp)

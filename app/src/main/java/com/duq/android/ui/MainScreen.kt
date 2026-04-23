@@ -33,10 +33,7 @@ import com.duq.android.error.DuqError
 import com.duq.android.service.DuqListenerService
 import com.duq.android.ui.components.ArcReactor
 import com.duq.android.ui.components.MessagesList
-
-private val BackgroundBlack = Color(0xFF0D0D0D)
-private val SurfaceGray = Color(0xFF1A1A1A)
-private val IronManRed = Color(0xFFE62429)
+import com.duq.android.ui.theme.DuqColors
 
 @Composable
 fun MainScreen(
@@ -131,7 +128,7 @@ fun MainScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(BackgroundBlack)
+            .background(DuqColors.background)
     ) {
         // Settings button - top right
         Box(
@@ -141,14 +138,14 @@ fun MainScreen(
                 .align(Alignment.TopEnd)
                 .size(44.dp)
                 .clip(CircleShape)
-                .background(SurfaceGray)
+                .background(DuqColors.surfaceVariant)
                 .clickable { onNavigateToSettings() },
             contentAlignment = Alignment.Center
         ) {
             Text(
                 text = "\u2699",
                 fontSize = 22.sp,
-                color = Color.White.copy(alpha = 0.6f)
+                color = DuqColors.textSecondary
             )
         }
 
@@ -176,7 +173,7 @@ fun MainScreen(
                     text = getStatusText(state, currentError),
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Light,
-                    color = if (currentError != null) IronManRed else Color.White.copy(alpha = 0.7f),
+                    color = if (currentError != null) DuqColors.error else DuqColors.textSecondary,
                     textAlign = TextAlign.Center,
                     letterSpacing = 2.sp
                 )

@@ -295,6 +295,60 @@ class KeycloakAuthManager @Inject constructor(
     }
 
     /**
+     * Direct login with username/password (Resource Owner Password Credentials flow)
+     * No browser redirect needed - credentials sent directly to Keycloak
+     */
+    suspend fun loginWithPassword(
+        username: String,
+        password: String
+    ): Result<TokenResponse> = withContext(Dispatchers.IO) {
+        try {
+            Log.d(TAG, "Direct login attempt for user: $username")
+
+            val formBody = FormBody.Builder()
+                .add("grant_type", "password")
+                .add("client_id", KeycloakConfig.CLIENT_ID)
+                .add("username", username)
+                .add("password", password)
+                .add("scope", KeycloakConfig.SCOPES.joinToString(" "))
+                .build()
+
+            val request = Request.Builder()
+                .url(KeycloakConfig.TOKEN_ENDPOINT.toString())
+                .post(formBody)
+                .build()
+
+            val response = httpClient.newCall(request).execute()
+
+            if (response.isSuccessful) {
+                val responseBody = response.body?.string() ?: ""
+                val json = JSONObject(responseBody)
+
+                val accessToken = json.getString("access_token")
+                val refreshToken = json.optString("refresh_token", null)
+                val idToken = json.optString("id_token", null)
+                val expiresIn = json.optLong("expires_in", AppConfig.DEFAULT_TOKEN_EXPIRES_S.toLong())
+                val expiresAt = System.currentTimeMillis() + (expiresIn * 1000)
+
+                Log.d(TAG, "Direct login successful")
+                Result.success(TokenResponse(accessToken, refreshToken, idToken, expiresAt))
+            } else {
+                val errorBody = response.body?.string() ?: ""
+                val errorMsg = try {
+                    JSONObject(errorBody).optString("error_description", "Login failed")
+                } catch (e: Exception) {
+                    "Login failed: ${response.code}"
+                }
+                Log.e(TAG, "Direct login error: ${response.code} - $errorMsg")
+                Result.failure(Exception(errorMsg))
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Direct login exception", e)
+            Result.failure(e)
+        }
+    }
+
+    /**
      * Gets user info from Keycloak
      * Security: Uses OkHttp instead of HttpURLConnection
      */
