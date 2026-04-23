@@ -27,8 +27,8 @@ object AppConfig {
     const val SILERO_SPEECH_DURATION_MS = 100
     const val SILERO_FRAME_SIZE = 512
 
-    // Wake word
-    const val WAKE_WORD_SENSITIVITY = 0.5f
+    // Wake word (0.0-1.0, higher = more sensitive, may cause false positives)
+    const val WAKE_WORD_SENSITIVITY = 0.9f
 
     // Service
     const val WAKE_LOCK_TIMEOUT_MS = 600000L  // 10 minutes
