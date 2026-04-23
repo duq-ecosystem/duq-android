@@ -1,3 +1,6 @@
+# ⛔ ЛОКАЛЬНОЕ ТЕСТИРОВАНИЕ ЗАПРЕЩЕНО - ТОЛЬКО VPS 90.156.230.49 ⛔
+
+
 # Duq Android
 
 > Voice-controlled AI assistant for Android with Keycloak SSO

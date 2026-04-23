@@ -10,7 +10,7 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 
-// Duq color palette - clean, modern, intelligent
+// Duq color palette - 2026 AI-native design with Glassmorphism
 object DuqColors {
     // Primary - Cyan/Teal (AI intelligence)
     val primary = Color(0xFF00D4FF)
@@ -21,11 +21,17 @@ object DuqColors {
     val accent = Color(0xFF9D4EDD)
     val accentLight = Color(0xFFBB86FC)
 
-    // Background
+    // Background - Ultra dark for Glassmorphism 2.0
     val background = Color(0xFF0A0A0F)
     val surface = Color(0xFF12121A)
     val surfaceVariant = Color(0xFF1A1A24)
     val surfaceElevated = Color(0xFF22222E)
+
+    // Glassmorphism 2.0 colors
+    val glassSurface = Color(0x1AFFFFFF)      // 10% white
+    val glassSurfaceHover = Color(0x26FFFFFF) // 15% white
+    val glassBorder = Color(0x33FFFFFF)       // 20% white
+    val glassHighlight = Color(0x4DFFFFFF)    // 30% white
 
     // Text
     val textPrimary = Color(0xFFF5F5F5)
@@ -37,12 +43,20 @@ object DuqColors {
     val warning = Color(0xFFFFB74D)
     val error = Color(0xFFFF5252)
 
-    // State colors for Duq orb
+    // AI State colors (2026 trends)
     val idle = primary
-    val listening = Color(0xFF00E5FF)
-    val processing = Color(0xFFFFAB40)
-    val speaking = success
+    val listening = Color(0xFF00E5FF)        // Bright cyan
+    val processing = Color(0xFFFFAB40)       // Orange thinking
+    val speaking = success                    // Green
     val errorState = error
+
+    // AI Confidence indicators
+    val aiConfident = Color(0xFF00E676)      // Green - high confidence
+    val aiModerate = Color(0xFFFFD740)       // Yellow - moderate
+    val aiUncertain = Color(0xFFFF8A65)      // Orange - low confidence
+
+    // Streaming text cursor
+    val cursorBlink = primary
 }
 
 private val DuqColorScheme = darkColorScheme(

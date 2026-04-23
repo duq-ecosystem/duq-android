@@ -33,6 +33,7 @@ class SettingsRepository(private val context: Context) {
         private const val KEY_REFRESH_TOKEN = "refresh_token"
         private const val KEY_ID_TOKEN = "id_token"
         private const val KEY_TOKEN_EXPIRES_AT = "token_expires_at"
+        private const val KEY_PORCUPINE_API_KEY = "porcupine_api_key"
     }
 
     private object PreferencesKeys {
@@ -41,9 +42,6 @@ class SettingsRepository(private val context: Context) {
         val USER_EMAIL = stringPreferencesKey("user_email")
         val USER_NAME = stringPreferencesKey("user_name")
         val USERNAME = stringPreferencesKey("username")
-
-        // App settings
-        val PORCUPINE_API_KEY = stringPreferencesKey("porcupine_api_key")
     }
 
     /**
@@ -111,10 +109,10 @@ class SettingsRepository(private val context: Context) {
             preferences[PreferencesKeys.USERNAME] ?: ""
         }
 
-    val porcupineApiKey: Flow<String> = context.dataStore.data
-        .map { preferences ->
-            preferences[PreferencesKeys.PORCUPINE_API_KEY] ?: ""
-        }
+    // Porcupine API key flow (from encrypted storage)
+    val porcupineApiKey: Flow<String> = flow {
+        emit(encryptedPrefs.getString(KEY_PORCUPINE_API_KEY, "") ?: "")
+    }
 
     val isAuthenticated: Flow<Boolean> = flow {
         val token = encryptedPrefs.getString(KEY_ACCESS_TOKEN, "") ?: ""
@@ -218,12 +216,20 @@ class SettingsRepository(private val context: Context) {
     }
 
     /**
-     * Save Porcupine API key
+     * Save Porcupine API key (to encrypted storage)
+     * Security: Uses EncryptedSharedPreferences with AES256 encryption
      */
     suspend fun savePorcupineApiKey(apiKey: String) {
-        context.dataStore.edit { preferences ->
-            preferences[PreferencesKeys.PORCUPINE_API_KEY] = apiKey
-        }
+        encryptedPrefs.edit()
+            .putString(KEY_PORCUPINE_API_KEY, apiKey)
+            .apply()
+    }
+
+    /**
+     * Get Porcupine API key synchronously (from encrypted storage)
+     */
+    suspend fun getPorcupineApiKey(): String {
+        return encryptedPrefs.getString(KEY_PORCUPINE_API_KEY, "") ?: ""
     }
 
     /**

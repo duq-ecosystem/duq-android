@@ -24,7 +24,9 @@ import java.net.UnknownHostException
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.delay
 
-class DuqApiClient : VoiceApiClientInterface {
+class DuqApiClient(
+    private val tokenRefreshInterceptor: TokenRefreshInterceptor? = null
+) : VoiceApiClientInterface {
 
     companion object {
         private const val TAG = "DuqApiClient"
@@ -33,11 +35,16 @@ class DuqApiClient : VoiceApiClientInterface {
         val BASE_URL: String = BuildConfig.API_BASE_URL
     }
 
-    private val client = OkHttpClient.Builder()
-        .connectTimeout(AppConfig.CONNECT_TIMEOUT_S, TimeUnit.SECONDS)
-        .readTimeout(AppConfig.READ_TIMEOUT_S, TimeUnit.SECONDS)
-        .writeTimeout(AppConfig.WRITE_TIMEOUT_S, TimeUnit.SECONDS)
-        .build()
+    private val client by lazy {
+        OkHttpClient.Builder()
+            .connectTimeout(AppConfig.CONNECT_TIMEOUT_S, TimeUnit.SECONDS)
+            .readTimeout(AppConfig.READ_TIMEOUT_S, TimeUnit.SECONDS)
+            .writeTimeout(AppConfig.WRITE_TIMEOUT_S, TimeUnit.SECONDS)
+            .apply {
+                tokenRefreshInterceptor?.let { addInterceptor(it) }
+            }
+            .build()
+    }
 
     private val gson = Gson()
 

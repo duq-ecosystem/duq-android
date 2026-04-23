@@ -1,6 +1,7 @@
 package com.duq.android.ui.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -21,16 +22,30 @@ import com.duq.android.data.model.MessageRole
 import com.duq.android.ui.theme.DuqColors
 import java.time.format.DateTimeFormatter
 
+/**
+ * Message bubble with Glassmorphism 2.0 design.
+ *
+ * Features:
+ * - Glass-like translucent backgrounds
+ * - Subtle gradient borders
+ * - Streaming text support for AI responses
+ *
+ * @param message The message to display
+ * @param isStreaming Whether AI response is currently streaming
+ * @param modifier Modifier for the component
+ */
 @Composable
 fun MessageBubble(
     message: Message,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    isStreaming: Boolean = false
 ) {
     val isUser = message.role == MessageRole.USER
     val alignment = if (isUser) Alignment.CenterEnd else Alignment.CenterStart
 
-    // User messages: subtle primary gradient
-    // Duq messages: glass-like surface effect
+    // Glassmorphism 2.0 design:
+    // User messages: subtle primary gradient with glass border
+    // Duq messages: frosted glass surface effect
     val backgroundBrush = if (isUser) {
         Brush.linearGradient(
             colors = listOf(
@@ -41,8 +56,8 @@ fun MessageBubble(
     } else {
         Brush.linearGradient(
             colors = listOf(
-                DuqColors.surfaceElevated,
-                DuqColors.surfaceVariant
+                DuqColors.glassSurface,
+                DuqColors.glassSurface.copy(alpha = 0.05f)
             )
         )
     }
@@ -65,6 +80,23 @@ fun MessageBubble(
                 .widthIn(max = 300.dp)
                 .clip(bubbleShape)
                 .background(backgroundBrush)
+                .border(
+                    width = 1.dp,
+                    brush = Brush.linearGradient(
+                        colors = if (isUser) {
+                            listOf(
+                                DuqColors.primary.copy(alpha = 0.3f),
+                                DuqColors.primary.copy(alpha = 0.1f)
+                            )
+                        } else {
+                            listOf(
+                                DuqColors.glassBorder,
+                                DuqColors.glassBorder.copy(alpha = 0.1f)
+                            )
+                        }
+                    ),
+                    shape = bubbleShape
+                )
                 .padding(horizontal = 14.dp, vertical = 10.dp)
         ) {
             // Sender label for Duq
@@ -79,13 +111,24 @@ fun MessageBubble(
                 )
             }
 
-            Text(
-                text = message.content,
-                fontSize = 15.sp,
-                lineHeight = 21.sp,
-                color = DuqColors.textPrimary,
-                fontWeight = FontWeight.Normal
-            )
+            // Use StreamingText for AI responses, regular Text for user
+            if (!isUser && (isStreaming || message.content.isNotEmpty())) {
+                StreamingText(
+                    text = message.content,
+                    isStreaming = isStreaming,
+                    fontSize = 15.sp,
+                    lineHeight = 21.sp,
+                    color = DuqColors.textPrimary
+                )
+            } else {
+                Text(
+                    text = message.content,
+                    fontSize = 15.sp,
+                    lineHeight = 21.sp,
+                    color = DuqColors.textPrimary,
+                    fontWeight = FontWeight.Normal
+                )
+            }
 
             val timeFormatter = DateTimeFormatter.ofPattern("HH:mm")
             Text(

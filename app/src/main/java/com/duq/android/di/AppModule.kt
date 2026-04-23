@@ -16,6 +16,7 @@ import com.duq.android.data.local.Migrations
 import com.duq.android.data.local.dao.ConversationDao
 import com.duq.android.data.local.dao.MessageDao
 import com.duq.android.network.DuqApiClient
+import com.duq.android.network.TokenRefreshInterceptor
 import com.duq.android.network.VoiceApiClientInterface
 import dagger.Module
 import dagger.Provides
@@ -47,8 +48,18 @@ object AppModule {
 
     @Provides
     @Singleton
-    fun provideVoiceApiClient(): VoiceApiClientInterface {
-        return DuqApiClient()
+    fun provideTokenRefreshInterceptor(
+        settingsRepository: SettingsRepository
+    ): TokenRefreshInterceptor {
+        return TokenRefreshInterceptor(settingsRepository)
+    }
+
+    @Provides
+    @Singleton
+    fun provideVoiceApiClient(
+        tokenRefreshInterceptor: TokenRefreshInterceptor
+    ): VoiceApiClientInterface {
+        return DuqApiClient(tokenRefreshInterceptor)
     }
 
     @Provides
@@ -101,8 +112,10 @@ object AppModule {
 
     @Provides
     @Singleton
-    fun provideDuqApiClient(): DuqApiClient {
-        return DuqApiClient()
+    fun provideDuqApiClient(
+        tokenRefreshInterceptor: TokenRefreshInterceptor
+    ): DuqApiClient {
+        return DuqApiClient(tokenRefreshInterceptor)
     }
 
     @Provides
