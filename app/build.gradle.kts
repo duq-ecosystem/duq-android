@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -5,6 +7,14 @@ plugins {
     id("com.google.dagger.hilt.android")
     id("com.google.devtools.ksp")
     id("jacoco")
+}
+
+// Load local.properties for secret keys
+val localProperties = Properties().apply {
+    val localPropertiesFile = rootProject.file("local.properties")
+    if (localPropertiesFile.exists()) {
+        load(localPropertiesFile.inputStream())
+    }
 }
 
 android {
@@ -53,6 +63,10 @@ android {
         buildConfigField("String", "KEYCLOAK_URL", "\"https://on-za-menya.online\"")
         buildConfigField("String", "KEYCLOAK_REALM", "\"duq\"")
         buildConfigField("String", "KEYCLOAK_CLIENT_ID", "\"duq-android\"")
+
+        // Porcupine API key (from local.properties, not committed to git)
+        val porcupineKey = localProperties.getProperty("PORCUPINE_API_KEY", "")
+        buildConfigField("String", "PORCUPINE_API_KEY", "\"$porcupineKey\"")
     }
 
     buildTypes {
@@ -157,8 +171,8 @@ dependencies {
     implementation("androidx.compose.material3:material3")
     implementation("androidx.navigation:navigation-compose:2.7.6")
 
-    // Porcupine Wake Word
-    implementation("ai.picovoice:porcupine-android:3.0.2")
+    // Porcupine Wake Word (v4 for custom wake word compatibility)
+    implementation("ai.picovoice:porcupine-android:4.0.0")
 
     // Networking
     implementation("com.squareup.okhttp3:okhttp:4.12.0")

@@ -11,6 +11,7 @@ import android.os.IBinder
 import android.os.PowerManager
 import android.os.Process
 import android.util.Log
+import com.duq.android.BuildConfig
 import com.duq.android.DuqState
 import com.duq.android.config.AppConfig
 import com.duq.android.data.SettingsRepository
@@ -146,7 +147,12 @@ class DuqListenerService : Service() {
             Log.d(TAG, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
             Log.d(TAG, "🎧 WAKE WORD MANAGER INITIALIZATION")
 
-            val apiKey = settingsRepository.porcupineApiKey.first()
+            // Try stored key first, fallback to BuildConfig
+            var apiKey = settingsRepository.porcupineApiKey.first()
+            if (apiKey.isBlank() && BuildConfig.PORCUPINE_API_KEY.isNotBlank()) {
+                apiKey = BuildConfig.PORCUPINE_API_KEY
+                Log.d(TAG, "Using Porcupine API key from BuildConfig")
+            }
             Log.d(TAG, "Porcupine API key: ${if (apiKey.isBlank()) "NOT SET" else "SET (${apiKey.take(10)}...)"}")
 
             if (apiKey.isBlank()) {
@@ -192,7 +198,7 @@ class DuqListenerService : Service() {
             notificationManager.updateNotification(_state.value)
 
             Log.d(TAG, "✅ WAKE WORD MANAGER READY")
-            Log.d(TAG, "Listening for Hey Duq'...")
+            Log.d(TAG, "Listening for 'Hey Duck'...")
             Log.d(TAG, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
         } catch (e: Exception) {
             Log.e(TAG, "❌ WAKE WORD INITIALIZATION FAILED")
@@ -206,7 +212,7 @@ class DuqListenerService : Service() {
 
     private fun onWakeWordDetected() {
         Log.d(TAG, "┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓")
-        Log.d(TAG, "┃  🔊 WAKE WORD DETECTED: HEY DUQ   ┃")
+        Log.d(TAG, "┃  🦆 WAKE WORD DETECTED: HEY DUCK  ┃")
         Log.d(TAG, "┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛")
         serviceScope.launch { processVoiceCommand() }
     }
