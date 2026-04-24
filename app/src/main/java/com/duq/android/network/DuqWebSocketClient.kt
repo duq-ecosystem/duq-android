@@ -5,6 +5,8 @@ import com.duq.android.BuildConfig
 import com.duq.android.data.SettingsRepository
 import com.google.gson.Gson
 import com.google.gson.annotations.SerializedName
+import com.duq.android.auth.KeycloakConfig
+import com.duq.android.config.AppConfig
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -15,12 +17,14 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import org.json.JSONObject
+import java.util.concurrent.TimeUnit
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
 import okhttp3.WebSocket
 import okhttp3.WebSocketListener
-import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -104,6 +108,7 @@ class DuqWebSocketClient @Inject constructor(
     /**
      * Connect to WebSocket server.
      * Uses Keycloak JWT token for authentication.
+     * Automatically refreshes token if expired.
      */
     suspend fun connect() {
         if (_connectionState.value == ConnectionState.Connected ||
@@ -116,6 +121,16 @@ class DuqWebSocketClient @Inject constructor(
         _connectionState.value = ConnectionState.Connecting
 
         try {
+            // Check if token needs refresh
+            if (settingsRepository.isTokenExpired()) {
+                Log.d(TAG, "Token expired, attempting refresh...")
+                if (!refreshToken()) {
+                    Log.e(TAG, "Token refresh failed")
+                    _connectionState.value = ConnectionState.Error("Token expired, please re-login")
+                    return
+                }
+            }
+
             val token = settingsRepository.accessToken.first()
             val deviceId = settingsRepository.deviceId.first()
 
@@ -236,4 +251,61 @@ class DuqWebSocketClient @Inject constructor(
      * Check if connected
      */
     fun isConnected(): Boolean = _connectionState.value == ConnectionState.Connected
+
+    /**
+     * Refresh access token using Keycloak refresh token.
+     * Returns true if refresh was successful.
+     */
+    private suspend fun refreshToken(): Boolean = withContext(Dispatchers.IO) {
+        try {
+            val refreshToken = settingsRepository.getRefreshToken()
+            if (refreshToken.isBlank()) {
+                Log.w(TAG, "No refresh token available")
+                return@withContext false
+            }
+
+            val formBody = okhttp3.FormBody.Builder()
+                .add("grant_type", "refresh_token")
+                .add("client_id", KeycloakConfig.CLIENT_ID)
+                .add("refresh_token", refreshToken)
+                .build()
+
+            val refreshClient = OkHttpClient.Builder()
+                .connectTimeout(AppConfig.AUTH_TIMEOUT_MS, TimeUnit.MILLISECONDS)
+                .readTimeout(AppConfig.AUTH_TIMEOUT_MS, TimeUnit.MILLISECONDS)
+                .build()
+
+            val request = Request.Builder()
+                .url(KeycloakConfig.TOKEN_ENDPOINT.toString())
+                .post(formBody)
+                .build()
+
+            val response = refreshClient.newCall(request).execute()
+
+            if (response.isSuccessful) {
+                val body = response.body?.string() ?: ""
+                val json = JSONObject(body)
+
+                val newAccessToken = json.getString("access_token")
+                val newRefreshToken = json.optString("refresh_token", null)
+                val expiresIn = json.optInt("expires_in", AppConfig.DEFAULT_TOKEN_EXPIRES_S)
+                val expiresAt = System.currentTimeMillis() + (expiresIn * 1000L)
+
+                settingsRepository.updateAccessToken(
+                    accessToken = newAccessToken,
+                    refreshToken = newRefreshToken,
+                    expiresAt = expiresAt
+                )
+
+                Log.d(TAG, "Token refreshed successfully")
+                true
+            } else {
+                Log.e(TAG, "Token refresh failed: HTTP ${response.code}")
+                false
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Token refresh exception", e)
+            false
+        }
+    }
 }

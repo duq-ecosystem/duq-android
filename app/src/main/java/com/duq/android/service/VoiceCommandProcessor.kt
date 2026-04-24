@@ -60,7 +60,8 @@ class VoiceCommandProcessor @Inject constructor(
     suspend fun processVoiceCommand(callback: StateCallback): ProcessingResult {
         val audioFile = File(context.cacheDir, "voice_command.wav")
 
-        return try {
+        return run processCommand@ {
+            try {
             Log.d(TAG, "═══════════════════════════════════════")
             Log.d(TAG, "🎙️ VOICE COMMAND PROCESSING START")
 
@@ -110,7 +111,7 @@ class VoiceCommandProcessor @Inject constructor(
                 }
                 if (!webSocketClient.isConnected()) {
                     Log.e(TAG, "❌ Failed to connect WebSocket, falling back to polling")
-                    return@try processWithPolling(authToken, userId, audioFile, callback)
+                    return@processCommand processWithPolling(authToken, userId, audioFile, callback)
                 }
             }
 
@@ -132,7 +133,7 @@ class VoiceCommandProcessor @Inject constructor(
                     if (response == null) {
                         // Task was already queued - poll for result instead of re-sending
                         Log.e(TAG, "❌ WebSocket response timeout, polling for task result")
-                        return@try pollForTaskResult(authToken, sendResult.taskId, callback)
+                        return@processCommand pollForTaskResult(authToken, sendResult.taskId, callback)
                     }
 
                     Log.d(TAG, "✅ WebSocket response received: type=${response.type}")
@@ -222,11 +223,12 @@ class VoiceCommandProcessor @Inject constructor(
             }
             callback.onError(error)
             ProcessingResult.Error(error)
-        } finally {
-            // Always clean up audio file to prevent file descriptor leaks
-            if (audioFile.exists()) {
-                Log.d(TAG, "Cleaning up audio file...")
-                audioFile.delete()
+            } finally {
+                // Always clean up audio file to prevent file descriptor leaks
+                if (audioFile.exists()) {
+                    Log.d(TAG, "Cleaning up audio file...")
+                    audioFile.delete()
+                }
             }
         }
     }

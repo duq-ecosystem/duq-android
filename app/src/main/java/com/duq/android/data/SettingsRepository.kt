@@ -34,6 +34,7 @@ class SettingsRepository(private val context: Context) {
         private const val KEY_ID_TOKEN = "id_token"
         private const val KEY_TOKEN_EXPIRES_AT = "token_expires_at"
         private const val KEY_PORCUPINE_API_KEY = "porcupine_api_key"
+        private const val KEY_DEVICE_ID = "device_id"
     }
 
     private object PreferencesKeys {
@@ -112,6 +113,17 @@ class SettingsRepository(private val context: Context) {
     // Porcupine API key flow (from encrypted storage)
     val porcupineApiKey: Flow<String> = flow {
         emit(encryptedPrefs.getString(KEY_PORCUPINE_API_KEY, "") ?: "")
+    }
+
+    // Device ID for WebSocket connection (from encrypted storage)
+    // Auto-generates UUID if not exists
+    val deviceId: Flow<String> = flow {
+        var id = encryptedPrefs.getString(KEY_DEVICE_ID, "") ?: ""
+        if (id.isEmpty()) {
+            id = java.util.UUID.randomUUID().toString()
+            encryptedPrefs.edit().putString(KEY_DEVICE_ID, id).apply()
+        }
+        emit(id)
     }
 
     val isAuthenticated: Flow<Boolean> = flow {
