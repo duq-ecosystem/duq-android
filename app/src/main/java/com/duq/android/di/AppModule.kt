@@ -9,17 +9,31 @@ import com.duq.android.audio.AudioRecorderInterface
 import com.duq.android.audio.VoiceActivityDetector
 import com.duq.android.audio.VoiceActivityDetectorInterface
 import com.duq.android.auth.KeycloakAuthManager
+import com.duq.android.auth.KeycloakTokenRefresher
+import com.duq.android.auth.KeycloakUserInfoFetcher
+import com.duq.android.auth.TokenRefresher
+import com.duq.android.auth.UserInfoFetcher
 import com.duq.android.data.ConversationRepository
 import com.duq.android.data.SettingsRepository
 import com.duq.android.data.local.DuqDatabase
 import com.duq.android.data.local.Migrations
 import com.duq.android.data.local.dao.ConversationDao
 import com.duq.android.data.local.dao.MessageDao
+import com.duq.android.audio.BeepPlayer
+import com.duq.android.audio.DefaultBeepPlayer
 import com.duq.android.logging.AndroidLogger
 import com.duq.android.logging.Logger
 import com.duq.android.network.ConversationApiClient
+import com.duq.android.service.ConversationUpdater
+import com.duq.android.service.DefaultConversationUpdater
+import com.duq.android.service.DefaultErrorMapper
+import com.duq.android.service.ErrorMapper
+import com.duq.android.network.DefaultHttpClientFactory
+import com.duq.android.network.DefaultRetryExecutor
 import com.duq.android.network.DuqApiClient
 import com.duq.android.network.DuqWebSocketClient
+import com.duq.android.network.HttpClientFactory
+import com.duq.android.network.RetryExecutor
 import com.duq.android.network.TokenRefreshInterceptor
 import com.duq.android.network.VoiceApiClientInterface
 import com.duq.android.wakeword.DefaultWakeWordManagerFactory
@@ -160,5 +174,49 @@ object AppModule {
     @Singleton
     fun provideLogger(): Logger {
         return AndroidLogger()
+    }
+
+    @Provides
+    @Singleton
+    fun provideBeepPlayer(): BeepPlayer {
+        return DefaultBeepPlayer()
+    }
+
+    @Provides
+    @Singleton
+    fun provideConversationUpdater(
+        conversationRepository: ConversationRepository
+    ): ConversationUpdater {
+        return DefaultConversationUpdater(conversationRepository)
+    }
+
+    @Provides
+    @Singleton
+    fun provideErrorMapper(): ErrorMapper {
+        return DefaultErrorMapper()
+    }
+
+    @Provides
+    @Singleton
+    fun provideHttpClientFactory(): HttpClientFactory {
+        return DefaultHttpClientFactory()
+    }
+
+    @Provides
+    @Singleton
+    fun provideRetryExecutor(): RetryExecutor {
+        return DefaultRetryExecutor()
+    }
+
+    @Provides
+    @Singleton
+    fun provideTokenRefresher(): TokenRefresher {
+        return KeycloakTokenRefresher()
+    }
+
+    @Provides
+    @Singleton
+    fun provideUserInfoFetcher(): UserInfoFetcher {
+        return KeycloakUserInfoFetcher()
     }
 }

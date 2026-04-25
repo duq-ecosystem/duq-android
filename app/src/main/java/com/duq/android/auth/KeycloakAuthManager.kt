@@ -443,16 +443,3 @@ class KeycloakAuthManager @Inject constructor(
         authService.dispose()
     }
 }
-
-/**
- * User info from Keycloak
- */
-data class UserInfo(
-    val sub: String,
-    val email: String,
-    val emailVerified: Boolean,
-    val name: String,
-    val preferredUsername: String,
-    val givenName: String,
-    val familyName: String
-)
