@@ -8,10 +8,12 @@ import com.duq.android.data.SettingsRepository
 import com.duq.android.data.model.Conversation
 import com.duq.android.data.model.Message
 import com.duq.android.error.DuqError
+import com.duq.android.network.DuqApiClient
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
@@ -22,7 +24,8 @@ import javax.inject.Inject
 @HiltViewModel
 class ConversationViewModel @Inject constructor(
     private val conversationRepository: ConversationRepository,
-    private val settingsRepository: SettingsRepository
+    private val settingsRepository: SettingsRepository,
+    private val duqApiClient: DuqApiClient
 ) : ViewModel() {
 
     companion object {
@@ -204,6 +207,60 @@ class ConversationViewModel @Inject constructor(
                     is java.io.IOException -> DuqError.NetworkError(e.message ?: "Network error")
                     else -> DuqError.NetworkError("Failed to create conversation: ${e.message}")
                 }
+            }
+        }
+    }
+
+    /**
+     * Send a text message to Duq
+     */
+    fun sendTextMessage(message: String) {
+        if (message.isBlank()) return
+
+        viewModelScope.launch {
+            try {
+                _isLoading.value = true
+                _error.value = null
+
+                val authToken = settingsRepository.getAccessToken()
+                if (authToken.isEmpty()) {
+                    Log.w(TAG, "No auth token available")
+                    _error.value = DuqError.AuthError("Not authenticated")
+                    return@launch
+                }
+
+                val userId = settingsRepository.userSub.first()
+                if (userId.isEmpty()) {
+                    Log.w(TAG, "No user ID available")
+                    _error.value = DuqError.AuthError("No user ID")
+                    return@launch
+                }
+
+                Log.d(TAG, "Sending text message: ${message.take(50)}...")
+
+                when (val result = duqApiClient.queueTextMessage(authToken, message, userId)) {
+                    is DuqApiClient.SendResult.Queued -> {
+                        Log.d(TAG, "Message queued with task_id: ${result.taskId}")
+                        // Response will come via WebSocket, then refresh messages
+                    }
+                    is DuqApiClient.SendResult.Error -> {
+                        Log.e(TAG, "Failed to send message: ${result.message}")
+                        _error.value = DuqError.NetworkError(result.message)
+                    }
+                    else -> {
+                        Log.w(TAG, "Unexpected result: $result")
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error sending message: ${e.message}")
+                _error.value = when (e) {
+                    is java.net.SocketTimeoutException -> DuqError.NetworkError.timeout()
+                    is java.net.UnknownHostException -> DuqError.NetworkError.noConnection()
+                    is java.io.IOException -> DuqError.NetworkError(e.message ?: "Network error")
+                    else -> DuqError.NetworkError("Failed to send message: ${e.message}")
+                }
+            } finally {
+                _isLoading.value = false
             }
         }
     }

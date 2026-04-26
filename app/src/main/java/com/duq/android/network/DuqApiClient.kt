@@ -352,6 +352,70 @@ class DuqApiClient(
     }
 
     /**
+     * Queue text message via POST /api/message (WebSocket mode).
+     * Returns task_id immediately - response will come via WebSocket.
+     */
+    suspend fun queueTextMessage(
+        authToken: String,
+        message: String,
+        userId: String
+    ): SendResult = withContext(Dispatchers.IO) {
+        try {
+            withRetry {
+                Log.d(TAG, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+                Log.d(TAG, "💬 QUEUE TEXT MESSAGE")
+                Log.d(TAG, "Message: ${message.take(50)}...")
+                Log.d(TAG, "User ID: $userId")
+
+                val messageRequest = MessageApiRequest(
+                    userId = userId,
+                    message = message,
+                    isVoice = false,
+                    source = "android"
+                )
+
+                val requestJson = gson.toJson(messageRequest)
+                val requestBody = requestJson.toRequestBody("application/json".toMediaType())
+
+                val request = Request.Builder()
+                    .url("$BASE_URL/api/message")
+                    .addHeader("Authorization", "Bearer $authToken")
+                    .post(requestBody)
+                    .build()
+
+                Log.d(TAG, "📤 Sending text message to queue...")
+                val response = client.newCall(request).execute()
+
+                if (!response.isSuccessful) {
+                    val errorBody = response.body?.string() ?: "Unknown error"
+                    Log.e(TAG, "❌ Queue request failed: HTTP ${response.code}")
+                    return@withRetry SendResult.Error(errorBody, response.code)
+                }
+
+                val responseBody = response.body?.string() ?: ""
+                val messageResponse = gson.fromJson(responseBody, MessageApiResponse::class.java)
+
+                if (messageResponse.error != null) {
+                    Log.e(TAG, "❌ Queue error: ${messageResponse.error}")
+                    return@withRetry SendResult.Error(messageResponse.error)
+                }
+
+                val taskId = messageResponse.taskId
+                    ?: return@withRetry SendResult.Error("No task_id in response")
+
+                Log.d(TAG, "📋 Text message queued: $taskId")
+                Log.d(TAG, "Waiting for WebSocket response...")
+                Log.d(TAG, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+
+                SendResult.Queued(taskId)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Queue text message exception: ${e.message}")
+            SendResult.Error(e.message ?: "Unknown error")
+        }
+    }
+
+    /**
      * Poll for a specific task result (public method for WebSocket fallback).
      * Used when WebSocket times out but task was already queued.
      */

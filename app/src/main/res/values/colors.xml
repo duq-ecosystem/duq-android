@@ -1,14 +1,34 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Iron Man Color Palette -->
-    <color name="iron_man_red">#E62429</color>
-    <color name="iron_man_red_light">#FF3B3B</color>
-    <color name="iron_man_red_dark">#8B1517</color>
-    <color name="iron_man_gold">#FFD700</color>
-    <color name="background_black">#0D0D0D</color>
-    <color name="surface_gray">#1A1A1A</color>
-    <color name="surface_variant">#252525</color>
+    <!-- DUQ Duck Color Palette 2026 -->
+
+    <!-- Primary - Duck Yellow -->
+    <color name="duck_yellow">#FFD60A</color>
+    <color name="duck_yellow_bright">#FFE84D</color>
+    <color name="duck_yellow_dim">#C9A800</color>
+    <color name="duck_yellow_dark">#8B7500</color>
+
+    <!-- Accent - Orange Beak -->
+    <color name="duck_orange">#FF8C00</color>
+    <color name="duck_orange_dim">#CC7000</color>
+    <color name="duck_orange_dark">#994D00</color>
+
+    <!-- Backgrounds - Cyberpunk Dark -->
+    <color name="background_black">#0A0A0A</color>
+    <color name="surface_card">#0F0F0F</color>
+    <color name="surface_panel">#141414</color>
+    <color name="surface_elevated">#1A1A1A</color>
+
+    <!-- Text -->
+    <color name="text_primary">#FFFFFF</color>
+    <color name="text_dim">#A0A0A0</color>
+    <color name="text_muted">#666666</color>
+
+    <!-- Status -->
+    <color name="status_success">#10B981</color>
+    <color name="status_warning">#F59E0B</color>
+    <color name="status_error">#EF4444</color>
 
     <!-- Launcher icon background -->
-    <color name="ic_launcher_background">#0D0D0D</color>
+    <color name="ic_launcher_background">#0A0A0A</color>
 </resources>

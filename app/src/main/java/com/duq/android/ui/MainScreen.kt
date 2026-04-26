@@ -17,10 +17,15 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.*
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.Alignment
 import kotlinx.coroutines.delay
 import androidx.compose.ui.Modifier
@@ -63,6 +68,9 @@ fun MainScreen(
     val isLoading by viewModel.isLoading.collectAsState()
     val conversations by viewModel.conversations.collectAsState()
     val currentConversation by viewModel.currentConversation.collectAsState()
+
+    // Text input state
+    var textInput by remember { mutableStateOf("") }
 
     // Bottom sheet state for conversation picker
     var showConversationPicker by remember { mutableStateOf(false) }
@@ -306,45 +314,110 @@ fun MainScreen(
             }
         }
 
-        // Main content - Arc Reactor + Messages
+        // Main content - Arc Reactor + Messages + Text Input
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(top = 80.dp) // Space for header
         ) {
-            // Arc Reactor + Status - top section
+            // Arc Reactor + Status - top section (smaller)
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(vertical = 16.dp),
+                    .padding(vertical = 8.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 ArcReactor(
                     state = state,
-                    modifier = Modifier.size(180.dp) // Reduced from 240dp
+                    modifier = Modifier.size(120.dp) // Reduced to make room for input
                 )
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(8.dp))
 
                 Text(
                     text = getStatusText(state, currentError),
-                    fontSize = 12.sp,
+                    fontSize = 11.sp,
                     fontWeight = FontWeight.Light,
-                    color = if (currentError != null) DuqColors.error else DuqColors.textSecondary,
+                    color = if (currentError != null) DuqColors.error else DuqColors.textDim,
                     textAlign = TextAlign.Center,
                     letterSpacing = 2.sp
                 )
             }
 
-            // Messages list - bottom section
+            // Messages list - middle section
             MessagesList(
                 messages = messages,
                 isLoading = isLoading,
                 modifier = Modifier
-                    .fillMaxSize()
+                    .weight(1f)
                     .padding(horizontal = 8.dp)
-                    .padding(bottom = 16.dp)
             )
+
+            // Text input - bottom section
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 8.dp)
+                    .navigationBarsPadding(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                OutlinedTextField(
+                    value = textInput,
+                    onValueChange = { textInput = it },
+                    modifier = Modifier.weight(1f),
+                    placeholder = {
+                        Text(
+                            text = "Type a message...",
+                            color = DuqColors.textMuted
+                        )
+                    },
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = DuqColors.textPrimary,
+                        unfocusedTextColor = DuqColors.textPrimary,
+                        focusedBorderColor = DuqColors.primary,
+                        unfocusedBorderColor = DuqColors.surfaceElevated,
+                        focusedContainerColor = DuqColors.surface,
+                        unfocusedContainerColor = DuqColors.surface,
+                        cursorColor = DuqColors.primary
+                    ),
+                    shape = RoundedCornerShape(24.dp),
+                    singleLine = false,
+                    maxLines = 4,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                    keyboardActions = KeyboardActions(
+                        onSend = {
+                            if (textInput.isNotBlank()) {
+                                viewModel.sendTextMessage(textInput)
+                                textInput = ""
+                            }
+                        }
+                    )
+                )
+
+                Spacer(modifier = Modifier.width(8.dp))
+
+                // Send button
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(CircleShape)
+                        .background(
+                            if (textInput.isNotBlank()) DuqColors.primary
+                            else DuqColors.surfaceElevated
+                        )
+                        .clickable(enabled = textInput.isNotBlank()) {
+                            viewModel.sendTextMessage(textInput)
+                            textInput = ""
+                        },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "➤",
+                        fontSize = 20.sp,
+                        color = if (textInput.isNotBlank()) Color.Black else DuqColors.textMuted
+                    )
+                }
+            }
         }
     }
 }

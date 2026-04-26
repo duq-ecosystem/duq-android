@@ -4,7 +4,7 @@
         <item name="android:statusBarColor">@color/background_black</item>
         <item name="android:navigationBarColor">@color/background_black</item>
         <item name="android:windowBackground">@color/background_black</item>
-        <item name="android:colorPrimary">@color/iron_man_red</item>
-        <item name="android:colorAccent">@color/iron_man_red_light</item>
+        <item name="android:colorPrimary">@color/duck_yellow</item>
+        <item name="android:colorAccent">@color/duck_yellow_bright</item>
     </style>
 </resources>

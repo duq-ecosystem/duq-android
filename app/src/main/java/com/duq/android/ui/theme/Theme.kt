@@ -10,50 +10,61 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 
-// Duq color palette - 2026 AI-native design with Glassmorphism
+/**
+ * DUQ Duck Color Palette 2026
+ * Cyberpunk aesthetic with rubber duck branding
+ */
 object DuqColors {
-    // Primary - Cyan/Teal (AI intelligence)
-    val primary = Color(0xFF00D4FF)
-    val primaryVariant = Color(0xFF00A8CC)
-    val primaryDark = Color(0xFF007A99)
+    // Primary - Duck Yellow (brand color)
+    val primary = Color(0xFFFFD60A)
+    val primaryBright = Color(0xFFFFE84D)
+    val primaryDim = Color(0xFFC9A800)
+    val primaryDark = Color(0xFF8B7500)
 
-    // Accent - Soft purple (creativity)
-    val accent = Color(0xFF9D4EDD)
-    val accentLight = Color(0xFFBB86FC)
+    // Accent - Orange Beak
+    val accent = Color(0xFFFF8C00)
+    val accentDim = Color(0xFFCC7000)
+    val accentDark = Color(0xFF994D00)
 
-    // Background - Ultra dark for Glassmorphism 2.0
-    val background = Color(0xFF0A0A0F)
-    val surface = Color(0xFF12121A)
-    val surfaceVariant = Color(0xFF1A1A24)
-    val surfaceElevated = Color(0xFF22222E)
+    // Background - Cyberpunk Dark
+    val background = Color(0xFF0A0A0A)
+    val surface = Color(0xFF0F0F0F)
+    val surfaceVariant = Color(0xFF141414)
+    val surfaceElevated = Color(0xFF1A1A1A)
 
-    // Glassmorphism 2.0 colors
-    val glassSurface = Color(0x1AFFFFFF)      // 10% white
-    val glassSurfaceHover = Color(0x26FFFFFF) // 15% white
-    val glassBorder = Color(0x33FFFFFF)       // 20% white
-    val glassHighlight = Color(0x4DFFFFFF)    // 30% white
+    // Glow effects (for cyberpunk aesthetic)
+    val glowYellow = Color(0x15FFD60A)      // 8% yellow
+    val glowYellowMedium = Color(0x26FFD60A) // 15% yellow
+    val glowYellowStrong = Color(0x40FFD60A) // 25% yellow
+
+    // Glass effect (subtle white overlay)
+    val glassSurface = Color(0x0DFFFFFF)     // 5% white
+    val glassBorder = Color(0x1AFFFFFF)      // 10% white
+    val glassHighlight = Color(0x33FFFFFF)   // 20% white
 
     // Text
-    val textPrimary = Color(0xFFF5F5F5)
-    val textSecondary = Color(0xFFB0B0B0)
-    val textTertiary = Color(0xFF707070)
+    val textPrimary = Color(0xFFFFFFFF)
+    val textSecondary = Color(0xFFA0A0A0)  // Alias for compatibility
+    val textDim = Color(0xFFA0A0A0)
+    val textTertiary = Color(0xFF666666)   // Alias for compatibility
+    val textMuted = Color(0xFF666666)
 
     // Status colors
-    val success = Color(0xFF00E676)
-    val warning = Color(0xFFFFB74D)
-    val error = Color(0xFFFF5252)
+    val success = Color(0xFF10B981)
+    val warning = Color(0xFFF59E0B)
+    val error = Color(0xFFEF4444)
 
-    // AI State colors (2026 trends)
-    val idle = primary
-    val listening = Color(0xFF00E5FF)        // Bright cyan
-    val processing = Color(0xFFFFAB40)       // Orange thinking
-    val speaking = success                    // Green
-    val errorState = error
+    // AI State colors
+    val idle = primary                        // Yellow - ready
+    val listening = primaryBright             // Bright yellow - active
+    val processing = accent                   // Orange - thinking
+    val speaking = success                    // Green - output
+    val errorState = error                    // Red - error
 
     // AI Confidence indicators
-    val aiConfident = Color(0xFF00E676)      // Green - high confidence
-    val aiModerate = Color(0xFFFFD740)       // Yellow - moderate
-    val aiUncertain = Color(0xFFFF8A65)      // Orange - low confidence
+    val aiConfident = success                 // Green - high confidence
+    val aiModerate = primary                  // Yellow - moderate
+    val aiUncertain = accent                  // Orange - low confidence
 
     // Streaming text cursor
     val cursorBlink = primary
@@ -62,7 +73,7 @@ object DuqColors {
 private val DuqColorScheme = darkColorScheme(
     primary = DuqColors.primary,
     secondary = DuqColors.accent,
-    tertiary = DuqColors.accentLight,
+    tertiary = DuqColors.primaryBright,
     background = DuqColors.background,
     surface = DuqColors.surface,
     surfaceVariant = DuqColors.surfaceVariant,
@@ -72,7 +83,7 @@ private val DuqColorScheme = darkColorScheme(
     onBackground = DuqColors.textPrimary,
     onSurface = DuqColors.textPrimary,
     error = DuqColors.error,
-    outline = Color(0xFF2A2A36)
+    outline = Color(0xFF2A2A2A)
 )
 
 @Composable
@@ -84,7 +95,6 @@ fun DuqAndroidTheme(
     val view = LocalView.current
     if (!view.isInEditMode) {
         SideEffect {
-            // Safe cast - context might not be Activity in some edge cases
             val activity = view.context as? Activity ?: return@SideEffect
             val window = activity.window
             window.statusBarColor = colorScheme.background.toArgb()
