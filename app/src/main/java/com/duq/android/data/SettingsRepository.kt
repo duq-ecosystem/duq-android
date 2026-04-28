@@ -168,6 +168,14 @@ class SettingsRepository(private val context: Context) {
     }
 
     /**
+     * Get token expiration time synchronously.
+     * Thread-safe. Use in OkHttp interceptors.
+     */
+    fun getTokenExpiresAtSync(): Long {
+        return encryptedPrefs.getLong(KEY_TOKEN_EXPIRES_AT, 0L)
+    }
+
+    /**
      * Update tokens synchronously.
      * Thread-safe. Use in OkHttp interceptors.
      */

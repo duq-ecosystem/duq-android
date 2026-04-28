@@ -198,6 +198,9 @@ dependencies {
     // Security - Encrypted SharedPreferences for token storage
     implementation("androidx.security:security-crypto:1.1.0-alpha06")
 
+    // Biometric authentication
+    implementation("androidx.biometric:biometric:1.1.0")
+
     // Browser for Custom Tabs (Keycloak login)
     implementation("androidx.browser:browser:1.7.0")
 

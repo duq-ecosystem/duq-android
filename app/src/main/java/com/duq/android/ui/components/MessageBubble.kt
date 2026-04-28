@@ -1,43 +1,39 @@
 package com.duq.android.ui.components
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.*
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.slideInHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.duq.android.audio.PlaybackState
 import com.duq.android.data.model.Message
 import com.duq.android.data.model.MessageRole
 import com.duq.android.ui.theme.DuqColors
 import java.time.format.DateTimeFormatter
 
 /**
- * Message bubble with Glassmorphism 2.0 design.
+ * Premium Message bubble with Glassmorphism 3.0 design.
  *
  * Features:
- * - Glass-like translucent backgrounds
- * - Subtle gradient borders
+ * - Animated slide-in entrance
+ * - Glass-like translucent backgrounds with subtle glow
+ * - Gradient borders with shimmer effect
  * - Streaming text support for AI responses
  * - Audio playback controls for voice messages
- *
- * @param message The message to display
- * @param isStreaming Whether AI response is currently streaming
- * @param audioPlaybackState Current audio playback state for this message
- * @param audioProgress Playback progress (0.0-1.0)
- * @param onAudioPlayPauseClick Callback when audio play/pause is clicked
- * @param modifier Modifier for the component
  */
 @Composable
 fun MessageBubble(
@@ -51,111 +47,228 @@ fun MessageBubble(
     val isUser = message.role == MessageRole.USER
     val alignment = if (isUser) Alignment.CenterEnd else Alignment.CenterStart
 
-    // Glassmorphism 2.0 design:
-    // User messages: subtle primary gradient with glass border
-    // Duq messages: frosted glass surface effect
-    val backgroundBrush = if (isUser) {
-        Brush.linearGradient(
-            colors = listOf(
-                DuqColors.primary.copy(alpha = 0.15f),
-                DuqColors.primary.copy(alpha = 0.08f)
-            )
+    // Animation state
+    var isVisible by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { isVisible = true }
+
+    // Glow animation for streaming
+    val infiniteTransition = rememberInfiniteTransition(label = "bubbleGlow")
+    val glowAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.1f,
+        targetValue = 0.3f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1500, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "glowAlpha"
+    )
+
+    // Premium color schemes
+    val (backgroundBrush, borderBrush, glowColor) = if (isUser) {
+        Triple(
+            Brush.linearGradient(
+                colors = listOf(
+                    DuqColors.primary.copy(alpha = 0.2f),
+                    DuqColors.primary.copy(alpha = 0.08f),
+                    DuqColors.primaryDim.copy(alpha = 0.05f)
+                ),
+                start = Offset(0f, 0f),
+                end = Offset(Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY)
+            ),
+            Brush.linearGradient(
+                colors = listOf(
+                    DuqColors.primary.copy(alpha = 0.5f),
+                    DuqColors.primary.copy(alpha = 0.2f),
+                    DuqColors.primaryDim.copy(alpha = 0.1f)
+                )
+            ),
+            DuqColors.primary
         )
     } else {
-        Brush.linearGradient(
-            colors = listOf(
-                DuqColors.glassSurface,
-                DuqColors.glassSurface.copy(alpha = 0.05f)
-            )
+        Triple(
+            Brush.linearGradient(
+                colors = listOf(
+                    DuqColors.surfaceElevated,
+                    DuqColors.surface.copy(alpha = 0.8f),
+                    DuqColors.surfaceVariant.copy(alpha = 0.5f)
+                ),
+                start = Offset(0f, 0f),
+                end = Offset(Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY)
+            ),
+            Brush.linearGradient(
+                colors = listOf(
+                    DuqColors.glassBorder.copy(alpha = 0.3f),
+                    DuqColors.glassBorder.copy(alpha = 0.1f),
+                    Color.Transparent
+                )
+            ),
+            if (isStreaming) DuqColors.accent else DuqColors.primary
         )
     }
 
     val bubbleShape = RoundedCornerShape(
-        topStart = 16.dp,
-        topEnd = 16.dp,
-        bottomStart = if (isUser) 16.dp else 4.dp,
-        bottomEnd = if (isUser) 4.dp else 16.dp
+        topStart = 20.dp,
+        topEnd = 20.dp,
+        bottomStart = if (isUser) 20.dp else 4.dp,
+        bottomEnd = if (isUser) 4.dp else 20.dp
     )
 
-    Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(vertical = 6.dp, horizontal = 12.dp),
-        contentAlignment = alignment
+    AnimatedVisibility(
+        visible = isVisible,
+        enter = slideInHorizontally(
+            initialOffsetX = { if (isUser) it else -it },
+            animationSpec = spring(dampingRatio = 0.8f, stiffness = 300f)
+        ) + fadeIn(animationSpec = tween(300))
     ) {
-        Column(
-            modifier = Modifier
-                .widthIn(max = 300.dp)
-                .clip(bubbleShape)
-                .background(backgroundBrush)
-                .border(
-                    width = 1.dp,
-                    brush = Brush.linearGradient(
-                        colors = if (isUser) {
-                            listOf(
-                                DuqColors.primary.copy(alpha = 0.3f),
-                                DuqColors.primary.copy(alpha = 0.1f)
-                            )
-                        } else {
-                            listOf(
-                                DuqColors.glassBorder,
-                                DuqColors.glassBorder.copy(alpha = 0.1f)
+        Box(
+            modifier = modifier
+                .fillMaxWidth()
+                .padding(vertical = 6.dp, horizontal = 12.dp),
+            contentAlignment = alignment
+        ) {
+            Column(
+                modifier = Modifier
+                    .widthIn(max = 320.dp)
+                    // Subtle glow effect behind bubble
+                    .drawBehind {
+                        if (isStreaming || !isUser) {
+                            drawCircle(
+                                brush = Brush.radialGradient(
+                                    colors = listOf(
+                                        glowColor.copy(alpha = if (isStreaming) glowAlpha else 0.05f),
+                                        Color.Transparent
+                                    ),
+                                    center = Offset(size.width * 0.3f, size.height * 0.5f),
+                                    radius = size.width * 0.8f
+                                )
                             )
                         }
-                    ),
-                    shape = bubbleShape
-                )
-                .padding(horizontal = 14.dp, vertical = 10.dp)
-        ) {
-            // Sender label for Duq
-            if (!isUser) {
+                    }
+                    .clip(bubbleShape)
+                    .background(backgroundBrush)
+                    .border(
+                        width = 1.dp,
+                        brush = borderBrush,
+                        shape = bubbleShape
+                    )
+                    .padding(horizontal = 16.dp, vertical = 12.dp)
+            ) {
+                // Sender label for Duq with icon
+                if (!isUser) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(bottom = 6.dp)
+                    ) {
+                        // Mini duck icon indicator
+                        Box(
+                            modifier = Modifier
+                                .size(8.dp)
+                                .background(
+                                    brush = Brush.radialGradient(
+                                        colors = listOf(
+                                            DuqColors.primary,
+                                            DuqColors.primaryDim
+                                        )
+                                    ),
+                                    shape = RoundedCornerShape(50)
+                                )
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "Duq",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = DuqColors.primary,
+                            letterSpacing = 1.sp
+                        )
+                        if (isStreaming) {
+                            Spacer(modifier = Modifier.width(8.dp))
+                            // Typing indicator dots
+                            TypingIndicator()
+                        }
+                    }
+                }
+
+                // Message content
+                if (!isUser && (isStreaming || message.content.isNotEmpty())) {
+                    StreamingText(
+                        text = message.content,
+                        isStreaming = isStreaming,
+                        fontSize = 15.sp,
+                        lineHeight = 22.sp,
+                        color = DuqColors.textPrimary
+                    )
+                } else {
+                    Text(
+                        text = message.content,
+                        fontSize = 15.sp,
+                        lineHeight = 22.sp,
+                        color = DuqColors.textPrimary,
+                        fontWeight = FontWeight.Normal
+                    )
+                }
+
+                // Audio playback controls for voice messages
+                if (message.hasAudio) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    AudioMessageControls(
+                        state = audioPlaybackState,
+                        durationMs = message.audioDurationMs,
+                        progress = audioProgress,
+                        onPlayPauseClick = onAudioPlayPauseClick
+                    )
+                }
+
+                // Timestamp
+                val timeFormatter = DateTimeFormatter.ofPattern("HH:mm")
                 Text(
-                    text = "Duq",
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = DuqColors.primary,
-                    letterSpacing = 0.5.sp,
-                    modifier = Modifier.padding(bottom = 4.dp)
+                    text = message.createdAt.atZone(java.time.ZoneId.systemDefault()).format(timeFormatter),
+                    fontSize = 10.sp,
+                    color = DuqColors.textMuted,
+                    modifier = Modifier
+                        .padding(top = 8.dp)
+                        .align(Alignment.End)
                 )
             }
+        }
+    }
+}
 
-            // Use StreamingText for AI responses, regular Text for user
-            if (!isUser && (isStreaming || message.content.isNotEmpty())) {
-                StreamingText(
-                    text = message.content,
-                    isStreaming = isStreaming,
-                    fontSize = 15.sp,
-                    lineHeight = 21.sp,
-                    color = DuqColors.textPrimary
-                )
-            } else {
-                Text(
-                    text = message.content,
-                    fontSize = 15.sp,
-                    lineHeight = 21.sp,
-                    color = DuqColors.textPrimary,
-                    fontWeight = FontWeight.Normal
-                )
-            }
+/**
+ * Animated typing indicator (three bouncing dots)
+ */
+@Composable
+private fun TypingIndicator() {
+    val infiniteTransition = rememberInfiniteTransition(label = "typing")
 
-            // Audio playback controls for voice messages
-            if (message.hasAudio) {
-                AudioMessageControls(
-                    state = audioPlaybackState,
-                    durationMs = message.audioDurationMs,
-                    progress = audioProgress,
-                    onPlayPauseClick = onAudioPlayPauseClick
-                )
-            }
+    Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+        repeat(3) { index ->
+            val delay = index * 150
+            val offsetY by infiniteTransition.animateFloat(
+                initialValue = 0f,
+                targetValue = -4f,
+                animationSpec = infiniteRepeatable(
+                    animation = keyframes {
+                        durationMillis = 600
+                        0f at 0
+                        -4f at 150
+                        0f at 300
+                        0f at 600
+                    },
+                    repeatMode = RepeatMode.Restart,
+                    initialStartOffset = StartOffset(delay)
+                ),
+                label = "dot$index"
+            )
 
-            val timeFormatter = DateTimeFormatter.ofPattern("HH:mm")
-            Text(
-                text = message.createdAt.atZone(java.time.ZoneId.systemDefault()).format(timeFormatter),
-                fontSize = 10.sp,
-                color = DuqColors.textTertiary,
+            Box(
                 modifier = Modifier
-                    .padding(top = 6.dp)
-                    .align(Alignment.End)
+                    .offset(y = offsetY.dp)
+                    .size(4.dp)
+                    .background(
+                        color = DuqColors.accent,
+                        shape = RoundedCornerShape(50)
+                    )
             )
         }
     }

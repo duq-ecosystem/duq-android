@@ -79,12 +79,21 @@ class ConversationRepository @Inject constructor(
     ): Result<List<Conversation>> {
         return try {
             if (forceRefresh) {
-                // Fetch from API and update cache
+                // Fetch from API and sync cache (add new, remove deleted)
                 val apiResult = apiClient.getConversations(authToken)
                 if (apiResult.isSuccess) {
                     val conversations = apiResult.getOrNull() ?: emptyList()
+
+                    // Insert/update conversations from API
                     conversationDao.insertConversations(conversations.map { it.toEntity() })
-                    Log.d(TAG, "Refreshed ${conversations.size} conversations from API")
+
+                    // Delete local conversations that no longer exist on server
+                    val apiIds = conversations.map { it.id }
+                    if (apiIds.isNotEmpty()) {
+                        conversationDao.deleteConversationsNotIn(apiIds)
+                    }
+
+                    Log.d(TAG, "Synced ${conversations.size} conversations from API")
                 }
             }
 

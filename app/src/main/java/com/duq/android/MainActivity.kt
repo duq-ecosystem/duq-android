@@ -3,14 +3,15 @@ package com.duq.android
 import android.content.Intent
 import android.os.Bundle
 import android.util.Log
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
+import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.lifecycleScope
+import com.duq.android.auth.BiometricAuthManager
 import com.duq.android.auth.KeycloakAuthManager
 import com.duq.android.data.SettingsRepository
 import com.duq.android.ui.DuqApp
@@ -22,7 +23,7 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @AndroidEntryPoint
-class MainActivity : ComponentActivity() {
+class MainActivity : FragmentActivity() {
 
     companion object {
         private const val TAG = "MainActivity"
@@ -42,6 +43,13 @@ class MainActivity : ComponentActivity() {
     @Inject
     lateinit var keycloakAuthManager: KeycloakAuthManager
 
+    @Inject
+    lateinit var biometricAuthManager: BiometricAuthManager
+
+    // Biometric login state
+    private val _biometricLoginComplete = MutableStateFlow(false)
+    val biometricLoginComplete = _biometricLoginComplete.asStateFlow()
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -53,6 +61,9 @@ class MainActivity : ComponentActivity() {
         // Check if this is an OAuth callback
         handleOAuthCallback(intent)
 
+        // Try biometric login if possible
+        tryBiometricLogin()
+
         enableEdgeToEdge()
         setContent {
             DuqAndroidTheme {
@@ -61,6 +72,42 @@ class MainActivity : ComponentActivity() {
                     color = MaterialTheme.colorScheme.background
                 ) {
                     DuqApp()
+                }
+            }
+        }
+    }
+
+    /**
+     * Try biometric login if:
+     * 1. User was previously logged in (has refresh token)
+     * 2. Biometric is available
+     */
+    private fun tryBiometricLogin() {
+        lifecycleScope.launch {
+            if (!biometricAuthManager.canUseBiometricLogin()) {
+                Log.d(TAG, "Biometric login not available")
+                _biometricLoginComplete.value = true
+                return@launch
+            }
+
+            Log.d(TAG, "Attempting biometric login...")
+
+            when (val result = biometricAuthManager.performBiometricLogin(this@MainActivity)) {
+                is BiometricAuthManager.BiometricLoginResult.Success -> {
+                    Log.d(TAG, "Biometric login successful!")
+                    _biometricLoginComplete.value = true
+                }
+                is BiometricAuthManager.BiometricLoginResult.Canceled -> {
+                    Log.d(TAG, "Biometric login canceled by user")
+                    _biometricLoginComplete.value = true
+                }
+                is BiometricAuthManager.BiometricLoginResult.NeedsFullLogin -> {
+                    Log.d(TAG, "Refresh token expired, need full Keycloak login")
+                    _biometricLoginComplete.value = true
+                }
+                is BiometricAuthManager.BiometricLoginResult.Error -> {
+                    Log.e(TAG, "Biometric login error: ${result.message}")
+                    _biometricLoginComplete.value = true
                 }
             }
         }

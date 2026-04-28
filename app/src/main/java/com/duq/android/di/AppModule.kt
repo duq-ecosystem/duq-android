@@ -8,6 +8,7 @@ import com.duq.android.audio.AudioRecorder
 import com.duq.android.audio.AudioRecorderInterface
 import com.duq.android.audio.VoiceActivityDetector
 import com.duq.android.audio.VoiceActivityDetectorInterface
+import com.duq.android.auth.BiometricAuthManager
 import com.duq.android.auth.KeycloakAuthManager
 import com.duq.android.auth.KeycloakTokenRefresher
 import com.duq.android.auth.KeycloakUserInfoFetcher
@@ -218,5 +219,15 @@ object AppModule {
     @Singleton
     fun provideUserInfoFetcher(): UserInfoFetcher {
         return KeycloakUserInfoFetcher()
+    }
+
+    @Provides
+    @Singleton
+    fun provideBiometricAuthManager(
+        @ApplicationContext context: Context,
+        settingsRepository: SettingsRepository,
+        tokenRefresher: TokenRefresher
+    ): BiometricAuthManager {
+        return BiometricAuthManager(context, settingsRepository, tokenRefresher)
     }
 }

@@ -37,6 +37,7 @@ class TokenRefreshInterceptor @Inject constructor(
     companion object {
         private const val TAG = "TokenRefreshInterceptor"
         private const val REFRESH_WAIT_TIMEOUT_MS = 30_000L
+        private const val TOKEN_EXPIRY_BUFFER_MS = 60_000L  // Refresh if expires in < 60s
     }
 
     // Prevent multiple concurrent token refreshes
@@ -57,11 +58,20 @@ class TokenRefreshInterceptor @Inject constructor(
 
     override fun intercept(chain: Interceptor.Chain): Response {
         val originalRequest = chain.request()
-        val response = chain.proceed(originalRequest)
 
-        // Only handle 401 for API requests (not Keycloak requests)
+        // Skip Keycloak requests to avoid recursion
         val keycloakHost = android.net.Uri.parse(KeycloakConfig.KEYCLOAK_URL).host
-        if (response.code != 401 || originalRequest.url.host == keycloakHost) {
+        if (originalRequest.url.host == keycloakHost) {
+            return chain.proceed(originalRequest)
+        }
+
+        // PROACTIVE: Check if token is about to expire and refresh BEFORE request
+        val requestWithFreshToken = ensureFreshToken(originalRequest)
+
+        val response = chain.proceed(requestWithFreshToken)
+
+        // REACTIVE: Handle 401 as fallback (e.g., token revoked server-side)
+        if (response.code != 401) {
             return response
         }
 
@@ -92,6 +102,63 @@ class TokenRefreshInterceptor @Inject constructor(
             }
 
             return retryWithNewToken(chain, originalRequest, response)
+        }
+    }
+
+    /**
+     * Proactively check and refresh token BEFORE making request.
+     * This prevents 401 errors by ensuring token is fresh.
+     *
+     * @param originalRequest The original request
+     * @return Request with fresh token in Authorization header
+     */
+    private fun ensureFreshToken(originalRequest: Request): Request {
+        val expiresAt = settingsRepository.getTokenExpiresAtSync()
+        val now = System.currentTimeMillis()
+        val timeUntilExpiry = expiresAt - now
+
+        // If token expires in less than 60 seconds, refresh it proactively
+        if (timeUntilExpiry < TOKEN_EXPIRY_BUFFER_MS) {
+            Log.d(TAG, "Token expires in ${timeUntilExpiry / 1000}s, refreshing proactively")
+
+            // Try to acquire refresh lock
+            if (isRefreshing.compareAndSet(false, true)) {
+                refreshLatch = CountDownLatch(1)
+                try {
+                    val refreshToken = settingsRepository.getRefreshTokenSync()
+                    if (refreshToken.isNotBlank()) {
+                        val refreshResult = refreshAccessToken(refreshToken)
+                        if (refreshResult.success) {
+                            Log.d(TAG, "Proactive token refresh successful")
+                            settingsRepository.updateAccessTokenSync(
+                                accessToken = refreshResult.accessToken,
+                                refreshToken = refreshResult.newRefreshToken,
+                                expiresAt = refreshResult.expiresAt
+                            )
+                        } else {
+                            Log.w(TAG, "Proactive token refresh failed: ${refreshResult.error}")
+                        }
+                    }
+                } finally {
+                    isRefreshing.set(false)
+                    refreshLatch?.countDown()
+                }
+            } else {
+                // Another thread is refreshing, wait for it
+                Log.d(TAG, "Waiting for ongoing token refresh...")
+                refreshLatch?.await(REFRESH_WAIT_TIMEOUT_MS, TimeUnit.MILLISECONDS)
+            }
+        }
+
+        // Get current (possibly refreshed) token and add to request
+        val currentToken = settingsRepository.getAccessTokenSync()
+        return if (currentToken.isNotBlank()) {
+            originalRequest.newBuilder()
+                .removeHeader("Authorization")
+                .addHeader("Authorization", "Bearer $currentToken")
+                .build()
+        } else {
+            originalRequest
         }
     }
 

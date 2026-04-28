@@ -7,19 +7,17 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.drawscope.Fill
-import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.graphics.*
+import androidx.compose.ui.graphics.drawscope.*
 import androidx.compose.ui.unit.dp
 import com.duq.android.DuqState
 import com.duq.android.ui.theme.DuqColors
-import kotlin.math.sin
+import kotlin.math.*
+import kotlin.random.Random
 
 /**
- * DuqDuck - Animated rubber duck mascot
- * Changes behavior based on AI state
+ * DuqDuck - Premium animated rubber duck mascot
+ * Professional design with 3D effects, particles, and smooth animations
  */
 @Composable
 fun DuqDuck(
@@ -30,10 +28,10 @@ fun DuqDuck(
 
     // Bobbing animation (floating on water)
     val bobSpeed = when (state) {
-        DuqState.LISTENING, DuqState.RECORDING -> 600
-        DuqState.PROCESSING -> 300
-        DuqState.PLAYING -> 800
-        else -> 1500
+        DuqState.LISTENING, DuqState.RECORDING -> 500
+        DuqState.PROCESSING -> 250
+        DuqState.PLAYING -> 700
+        else -> 1200
     }
 
     val bob by infiniteTransition.animateFloat(
@@ -46,13 +44,13 @@ fun DuqDuck(
         label = "bob"
     )
 
-    // Head tilt for listening state
+    // Smooth head tilt
     val headTilt by infiniteTransition.animateFloat(
-        initialValue = -5f,
-        targetValue = 5f,
+        initialValue = -8f,
+        targetValue = 8f,
         animationSpec = infiniteRepeatable(
             animation = tween(
-                durationMillis = if (state == DuqState.LISTENING || state == DuqState.RECORDING) 400 else 2000,
+                durationMillis = if (state == DuqState.LISTENING || state == DuqState.RECORDING) 350 else 1800,
                 easing = FastOutSlowInEasing
             ),
             repeatMode = RepeatMode.Reverse
@@ -60,16 +58,17 @@ fun DuqDuck(
         label = "headTilt"
     )
 
-    // Glow pulse
+    // Glow pulse with breathing effect
     val glowPulse by infiniteTransition.animateFloat(
-        initialValue = 0.3f,
-        targetValue = 0.8f,
+        initialValue = 0.2f,
+        targetValue = 1f,
         animationSpec = infiniteRepeatable(
             animation = tween(
                 durationMillis = when (state) {
-                    DuqState.PROCESSING -> 400
-                    DuqState.PLAYING -> 600
-                    else -> 1500
+                    DuqState.PROCESSING -> 350
+                    DuqState.PLAYING -> 500
+                    DuqState.LISTENING, DuqState.RECORDING -> 400
+                    else -> 2000
                 },
                 easing = FastOutSlowInEasing
             ),
@@ -83,10 +82,38 @@ fun DuqDuck(
         initialValue = 0f,
         targetValue = 1f,
         animationSpec = infiniteRepeatable(
-            animation = tween(2000, easing = LinearEasing),
+            animation = tween(2500, easing = LinearEasing),
             repeatMode = RepeatMode.Restart
         ),
         label = "ripple"
+    )
+
+    // Particle rotation
+    val particleRotation by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(3000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "particleRotation"
+    )
+
+    // Eye blink animation
+    val blink by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = keyframes {
+                durationMillis = 4000
+                0f at 0
+                0f at 3700
+                1f at 3850
+                0f at 4000
+            },
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "blink"
     )
 
     // State-based glow color
@@ -99,209 +126,381 @@ fun DuqDuck(
         null -> DuqColors.textMuted
     }
 
-    Canvas(modifier = modifier.size(160.dp)) {
+    // Particle seeds
+    val particles = remember { List(12) { Random.nextFloat() to Random.nextFloat() } }
+
+    Canvas(modifier = modifier.size(180.dp)) {
         val centerX = size.width / 2
         val centerY = size.height / 2
-        val duckSize = size.minDimension * 0.7f
-        val bobOffset = bob * 8f
+        val duckSize = size.minDimension * 0.65f
+        val bobOffset = bob * 10f
 
-        // Outer glow
-        drawCircle(
-            brush = Brush.radialGradient(
-                colors = listOf(
-                    glowColor.copy(alpha = 0.3f * glowPulse),
-                    glowColor.copy(alpha = 0.1f * glowPulse),
-                    Color.Transparent
+        // === BACKGROUND GLOW ===
+        // Multiple layered glows for depth
+        for (i in 3 downTo 0) {
+            val glowRadius = duckSize * (0.7f + i * 0.15f)
+            val alpha = (0.15f - i * 0.03f) * glowPulse
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(
+                        glowColor.copy(alpha = alpha),
+                        glowColor.copy(alpha = alpha * 0.5f),
+                        Color.Transparent
+                    ),
+                    center = Offset(centerX, centerY),
+                    radius = glowRadius
                 ),
-                center = Offset(centerX, centerY),
-                radius = duckSize * 0.9f
-            ),
-            radius = duckSize * 0.9f,
-            center = Offset(centerX, centerY)
-        )
+                radius = glowRadius,
+                center = Offset(centerX, centerY)
+            )
+        }
 
-        // Water ripples
-        val rippleRadius1 = duckSize * 0.5f + ripple * duckSize * 0.4f
-        val rippleRadius2 = duckSize * 0.5f + ((ripple + 0.5f) % 1f) * duckSize * 0.4f
-        val rippleAlpha1 = (1f - ripple) * 0.3f
-        val rippleAlpha2 = (1f - ((ripple + 0.5f) % 1f)) * 0.3f
+        // === FLOATING PARTICLES ===
+        if (state == DuqState.PROCESSING || state == DuqState.LISTENING || state == DuqState.RECORDING) {
+            particles.forEachIndexed { index, (seed1, seed2) ->
+                val angle = (index * 30f + particleRotation * (0.5f + seed1 * 0.5f)) * (PI / 180f).toFloat()
+                val distance = duckSize * (0.45f + seed2 * 0.35f)
+                val particleX = centerX + cos(angle) * distance
+                val particleY = centerY + sin(angle) * distance
+                val particleSize = 2f + seed1 * 4f
+                val particleAlpha = (0.3f + seed2 * 0.5f) * glowPulse
 
-        drawCircle(
-            color = DuqColors.primary.copy(alpha = rippleAlpha1),
-            radius = rippleRadius1,
-            center = Offset(centerX, centerY + duckSize * 0.25f),
-            style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2f)
-        )
-        drawCircle(
-            color = DuqColors.primary.copy(alpha = rippleAlpha2),
-            radius = rippleRadius2,
-            center = Offset(centerX, centerY + duckSize * 0.25f),
-            style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2f)
-        )
+                drawCircle(
+                    color = glowColor.copy(alpha = particleAlpha),
+                    radius = particleSize,
+                    center = Offset(particleX, particleY)
+                )
+            }
+        }
+
+        // === WATER RIPPLES ===
+        for (i in 0..2) {
+            val ripplePhase = (ripple + i * 0.33f) % 1f
+            val rippleRadius = duckSize * 0.4f + ripplePhase * duckSize * 0.5f
+            val rippleAlpha = (1f - ripplePhase) * 0.25f
+
+            drawCircle(
+                color = DuqColors.primary.copy(alpha = rippleAlpha),
+                radius = rippleRadius,
+                center = Offset(centerX, centerY + duckSize * 0.28f + bobOffset),
+                style = Stroke(width = 2f - ripplePhase)
+            )
+        }
 
         // Duck body position
         val bodyY = centerY + bobOffset
 
-        // === DUCK BODY ===
-        // Main body (yellow oval)
-        val bodyPath = Path().apply {
-            val bodyWidth = duckSize * 0.6f
-            val bodyHeight = duckSize * 0.45f
-            val bodyLeft = centerX - bodyWidth / 2
-            val bodyTop = bodyY - bodyHeight / 2
+        // === SHADOW ===
+        drawOval(
+            color = Color.Black.copy(alpha = 0.2f),
+            topLeft = Offset(centerX - duckSize * 0.25f, centerY + duckSize * 0.32f),
+            size = Size(duckSize * 0.5f, duckSize * 0.12f)
+        )
 
-            // Rounded body shape
-            moveTo(centerX, bodyTop)
+        // === DUCK BODY ===
+        val bodyPath = Path().apply {
+            val bodyWidth = duckSize * 0.55f
+            val bodyHeight = duckSize * 0.42f
+            val bodyTop = bodyY - bodyHeight * 0.3f
+
+            // Smooth body curve
+            moveTo(centerX - bodyWidth * 0.1f, bodyTop)
+            // Top curve
             cubicTo(
-                centerX + bodyWidth * 0.6f, bodyTop,
-                centerX + bodyWidth * 0.5f, bodyY + bodyHeight * 0.5f,
-                centerX, bodyY + bodyHeight * 0.4f
+                centerX + bodyWidth * 0.5f, bodyTop - bodyHeight * 0.1f,
+                centerX + bodyWidth * 0.55f, bodyY + bodyHeight * 0.2f,
+                centerX + bodyWidth * 0.1f, bodyY + bodyHeight * 0.35f
             )
+            // Tail
             cubicTo(
-                centerX - bodyWidth * 0.5f, bodyY + bodyHeight * 0.5f,
-                centerX - bodyWidth * 0.6f, bodyTop,
-                centerX, bodyTop
+                centerX - bodyWidth * 0.2f, bodyY + bodyHeight * 0.45f,
+                centerX - bodyWidth * 0.55f, bodyY + bodyHeight * 0.2f,
+                centerX - bodyWidth * 0.45f, bodyY - bodyHeight * 0.1f
+            )
+            // Back to top
+            cubicTo(
+                centerX - bodyWidth * 0.35f, bodyTop - bodyHeight * 0.05f,
+                centerX - bodyWidth * 0.15f, bodyTop - bodyHeight * 0.05f,
+                centerX - bodyWidth * 0.1f, bodyTop
             )
             close()
         }
 
-        // Body shadow
+        // Body with gradient
         drawPath(
             path = bodyPath,
-            color = DuqColors.primaryDim.copy(alpha = 0.5f),
-            style = Fill
-        )
-
-        // Body gradient
-        drawCircle(
             brush = Brush.radialGradient(
                 colors = listOf(
-                    DuqColors.primaryBright,
+                    Color(0xFFFFE566), // Bright highlight
                     DuqColors.primary,
                     DuqColors.primaryDim
                 ),
-                center = Offset(centerX - duckSize * 0.1f, bodyY - duckSize * 0.1f),
-                radius = duckSize * 0.35f
+                center = Offset(centerX - duckSize * 0.1f, bodyY - duckSize * 0.15f),
+                radius = duckSize * 0.45f
+            )
+        )
+
+        // Body highlight (glossy effect)
+        drawOval(
+            brush = Brush.radialGradient(
+                colors = listOf(
+                    Color.White.copy(alpha = 0.4f),
+                    Color.Transparent
+                ),
+                center = Offset(centerX - duckSize * 0.08f, bodyY - duckSize * 0.1f),
+                radius = duckSize * 0.15f
             ),
-            radius = duckSize * 0.28f,
-            center = Offset(centerX, bodyY)
+            topLeft = Offset(centerX - duckSize * 0.2f, bodyY - duckSize * 0.2f),
+            size = Size(duckSize * 0.25f, duckSize * 0.15f)
         )
 
         // === DUCK HEAD ===
-        rotate(headTilt, pivot = Offset(centerX, bodyY - duckSize * 0.15f)) {
-            val headCenterX = centerX
-            val headCenterY = bodyY - duckSize * 0.25f
-            val headRadius = duckSize * 0.18f
+        rotate(headTilt, pivot = Offset(centerX + duckSize * 0.05f, bodyY - duckSize * 0.2f)) {
+            val headCenterX = centerX + duckSize * 0.08f
+            val headCenterY = bodyY - duckSize * 0.28f
+            val headRadius = duckSize * 0.2f
 
-            // Head
+            // Head with gradient
             drawCircle(
                 brush = Brush.radialGradient(
                     colors = listOf(
-                        DuqColors.primaryBright,
-                        DuqColors.primary
+                        Color(0xFFFFE566),
+                        DuqColors.primary,
+                        DuqColors.primaryDim
                     ),
                     center = Offset(headCenterX - headRadius * 0.3f, headCenterY - headRadius * 0.3f),
-                    radius = headRadius * 1.2f
+                    radius = headRadius * 1.3f
                 ),
                 radius = headRadius,
                 center = Offset(headCenterX, headCenterY)
             )
 
+            // Head highlight
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(
+                        Color.White.copy(alpha = 0.5f),
+                        Color.Transparent
+                    )
+                ),
+                radius = headRadius * 0.4f,
+                center = Offset(headCenterX - headRadius * 0.3f, headCenterY - headRadius * 0.35f)
+            )
+
             // === BEAK ===
             val beakPath = Path().apply {
-                val beakStartX = headCenterX + headRadius * 0.6f
-                val beakY = headCenterY + headRadius * 0.1f
-                val beakLength = duckSize * 0.12f
-                val beakHeight = duckSize * 0.06f
+                val beakStartX = headCenterX + headRadius * 0.7f
+                val beakY = headCenterY + headRadius * 0.15f
+                val beakLength = duckSize * 0.15f
+                val beakHeight = duckSize * 0.08f
 
-                moveTo(beakStartX, beakY - beakHeight / 2)
-                lineTo(beakStartX + beakLength, beakY)
-                lineTo(beakStartX, beakY + beakHeight / 2)
+                // Upper beak
+                moveTo(beakStartX - duckSize * 0.02f, beakY - beakHeight * 0.3f)
+                quadraticBezierTo(
+                    beakStartX + beakLength * 0.7f, beakY - beakHeight * 0.5f,
+                    beakStartX + beakLength, beakY
+                )
+                // Lower beak
+                quadraticBezierTo(
+                    beakStartX + beakLength * 0.7f, beakY + beakHeight * 0.6f,
+                    beakStartX - duckSize * 0.02f, beakY + beakHeight * 0.4f
+                )
                 close()
             }
 
             drawPath(
                 path = beakPath,
                 brush = Brush.linearGradient(
-                    colors = listOf(DuqColors.accent, DuqColors.accentDim),
-                    start = Offset(headCenterX + headRadius, headCenterY),
-                    end = Offset(headCenterX + headRadius + duckSize * 0.1f, headCenterY)
-                ),
-                style = Fill
+                    colors = listOf(
+                        Color(0xFFFF9500),
+                        DuqColors.accent,
+                        DuqColors.accentDim
+                    ),
+                    start = Offset(headCenterX + headRadius, headCenterY - duckSize * 0.02f),
+                    end = Offset(headCenterX + headRadius + duckSize * 0.12f, headCenterY + duckSize * 0.02f)
+                )
+            )
+
+            // Beak highlight
+            drawPath(
+                path = Path().apply {
+                    val beakStartX = headCenterX + headRadius * 0.7f
+                    val beakY = headCenterY + headRadius * 0.05f
+                    moveTo(beakStartX, beakY)
+                    quadraticBezierTo(
+                        beakStartX + duckSize * 0.05f, beakY - duckSize * 0.02f,
+                        beakStartX + duckSize * 0.08f, beakY
+                    )
+                },
+                color = Color.White.copy(alpha = 0.3f),
+                style = Stroke(width = 2f)
             )
 
             // === EYE ===
-            val eyeX = headCenterX + headRadius * 0.3f
-            val eyeY = headCenterY - headRadius * 0.1f
-            val eyeRadius = headRadius * 0.25f
+            val eyeX = headCenterX + headRadius * 0.25f
+            val eyeY = headCenterY - headRadius * 0.15f
+            val eyeRadius = headRadius * 0.28f
+
+            // Eye socket shadow
+            drawCircle(
+                color = DuqColors.primaryDark.copy(alpha = 0.3f),
+                radius = eyeRadius * 1.1f,
+                center = Offset(eyeX + 1f, eyeY + 1f)
+            )
 
             // Eye white
-            drawCircle(
+            val eyeHeight = eyeRadius * 2f * (1f - blink * 0.9f)
+            drawOval(
                 color = Color.White,
-                radius = eyeRadius,
-                center = Offset(eyeX, eyeY)
+                topLeft = Offset(eyeX - eyeRadius, eyeY - eyeHeight / 2),
+                size = Size(eyeRadius * 2f, eyeHeight)
             )
 
-            // Eye pupil (looks in direction based on state)
-            val pupilOffsetX = when (state) {
-                DuqState.LISTENING, DuqState.RECORDING -> eyeRadius * 0.2f
-                DuqState.PROCESSING -> sin(bob * Math.PI.toFloat() * 2) * eyeRadius * 0.3f
-                else -> 0f
+            if (blink < 0.5f) {
+                // Pupil with state-based movement
+                val pupilOffsetX = when (state) {
+                    DuqState.LISTENING, DuqState.RECORDING -> eyeRadius * 0.25f * sin(bob * PI.toFloat())
+                    DuqState.PROCESSING -> sin(particleRotation * PI.toFloat() / 180f) * eyeRadius * 0.3f
+                    else -> eyeRadius * 0.1f
+                }
+                val pupilOffsetY = when (state) {
+                    DuqState.PROCESSING -> cos(particleRotation * PI.toFloat() / 180f) * eyeRadius * 0.15f
+                    else -> 0f
+                }
+
+                drawCircle(
+                    brush = Brush.radialGradient(
+                        colors = listOf(
+                            Color(0xFF1A1A1A),
+                            Color.Black
+                        )
+                    ),
+                    radius = eyeRadius * 0.55f,
+                    center = Offset(eyeX + pupilOffsetX, eyeY + pupilOffsetY)
+                )
+
+                // Eye sparkle
+                drawCircle(
+                    color = Color.White,
+                    radius = eyeRadius * 0.18f,
+                    center = Offset(eyeX - eyeRadius * 0.15f + pupilOffsetX * 0.3f, eyeY - eyeRadius * 0.2f)
+                )
+
+                // Secondary sparkle
+                drawCircle(
+                    color = Color.White.copy(alpha = 0.6f),
+                    radius = eyeRadius * 0.08f,
+                    center = Offset(eyeX + eyeRadius * 0.2f + pupilOffsetX * 0.3f, eyeY + eyeRadius * 0.1f)
+                )
             }
-            drawCircle(
-                color = Color.Black,
-                radius = eyeRadius * 0.5f,
-                center = Offset(eyeX + pupilOffsetX, eyeY)
-            )
-
-            // Eye highlight
-            drawCircle(
-                color = Color.White,
-                radius = eyeRadius * 0.2f,
-                center = Offset(eyeX - eyeRadius * 0.2f, eyeY - eyeRadius * 0.2f)
-            )
         }
 
         // === WING ===
+        val wingWave = sin(bob * PI.toFloat() * 2) * 3f
         val wingPath = Path().apply {
-            val wingX = centerX - duckSize * 0.15f
-            val wingY = bodyY + duckSize * 0.05f
-            val wingWidth = duckSize * 0.15f
-            val wingHeight = duckSize * 0.12f
+            val wingX = centerX - duckSize * 0.12f
+            val wingY = bodyY + duckSize * 0.02f + wingWave
+            val wingWidth = duckSize * 0.18f
+            val wingHeight = duckSize * 0.14f
 
-            moveTo(wingX, wingY)
+            moveTo(wingX + wingWidth * 0.3f, wingY - wingHeight * 0.2f)
             quadraticBezierTo(
-                wingX - wingWidth * 0.5f, wingY + wingHeight,
-                wingX + wingWidth, wingY + wingHeight * 0.5f
+                wingX - wingWidth * 0.3f, wingY + wingHeight * 0.5f,
+                wingX + wingWidth * 0.2f, wingY + wingHeight * 0.8f
             )
             quadraticBezierTo(
-                wingX + wingWidth * 0.3f, wingY,
-                wingX, wingY
+                wingX + wingWidth * 0.8f, wingY + wingHeight * 0.4f,
+                wingX + wingWidth * 0.3f, wingY - wingHeight * 0.2f
             )
             close()
         }
 
         drawPath(
             path = wingPath,
+            brush = Brush.linearGradient(
+                colors = listOf(
+                    DuqColors.primaryDim,
+                    DuqColors.primaryDark
+                ),
+                start = Offset(centerX - duckSize * 0.1f, bodyY),
+                end = Offset(centerX - duckSize * 0.15f, bodyY + duckSize * 0.15f)
+            )
+        )
+
+        // === TAIL FEATHERS ===
+        val tailPath = Path().apply {
+            val tailX = centerX - duckSize * 0.35f
+            val tailY = bodyY + duckSize * 0.05f
+
+            moveTo(tailX, tailY)
+            quadraticBezierTo(
+                tailX - duckSize * 0.12f, tailY - duckSize * 0.08f,
+                tailX - duckSize * 0.08f, tailY - duckSize * 0.12f
+            )
+            quadraticBezierTo(
+                tailX - duckSize * 0.05f, tailY - duckSize * 0.05f,
+                tailX, tailY
+            )
+        }
+
+        drawPath(
+            path = tailPath,
             color = DuqColors.primaryDim,
             style = Fill
         )
 
-        // Processing indicator (spinning dots around duck)
+        // === PROCESSING ORBITAL RING ===
         if (state == DuqState.PROCESSING) {
-            val dotCount = 6
-            val dotRadius = duckSize * 0.03f
-            val orbitRadius = duckSize * 0.45f
+            val orbitRadius = duckSize * 0.5f
 
-            for (i in 0 until dotCount) {
-                val angle = (i * 360f / dotCount + ripple * 360f) * (Math.PI / 180f).toFloat()
-                val dotX = centerX + kotlin.math.cos(angle) * orbitRadius
-                val dotY = centerY + kotlin.math.sin(angle) * orbitRadius
+            // Ring glow
+            drawCircle(
+                brush = Brush.sweepGradient(
+                    colors = listOf(
+                        DuqColors.accent.copy(alpha = 0.6f),
+                        DuqColors.accent.copy(alpha = 0.1f),
+                        Color.Transparent,
+                        DuqColors.accent.copy(alpha = 0.1f),
+                        DuqColors.accent.copy(alpha = 0.6f)
+                    )
+                ),
+                radius = orbitRadius,
+                center = Offset(centerX, centerY),
+                style = Stroke(width = 3f)
+            )
 
-                drawCircle(
-                    color = DuqColors.accent.copy(alpha = 0.8f - (i * 0.1f)),
-                    radius = dotRadius,
-                    center = Offset(dotX, dotY)
+            // Orbiting dot
+            val dotAngle = particleRotation * (PI / 180f).toFloat()
+            val dotX = centerX + cos(dotAngle) * orbitRadius
+            val dotY = centerY + sin(dotAngle) * orbitRadius
+
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(
+                        Color.White,
+                        DuqColors.accent,
+                        DuqColors.accent.copy(alpha = 0f)
+                    )
+                ),
+                radius = duckSize * 0.05f,
+                center = Offset(dotX, dotY)
+            )
+        }
+
+        // === SOUND WAVES (Playing state) ===
+        if (state == DuqState.PLAYING) {
+            for (i in 0..2) {
+                val wavePhase = (glowPulse + i * 0.3f) % 1f
+                val waveRadius = duckSize * 0.4f + wavePhase * duckSize * 0.3f
+
+                drawArc(
+                    color = DuqColors.success.copy(alpha = (1f - wavePhase) * 0.4f),
+                    startAngle = -30f,
+                    sweepAngle = 60f,
+                    useCenter = false,
+                    topLeft = Offset(centerX + duckSize * 0.2f - waveRadius, centerY - duckSize * 0.3f - waveRadius),
+                    size = Size(waveRadius * 2, waveRadius * 2),
+                    style = Stroke(width = 3f - wavePhase * 2f)
                 )
             }
         }
