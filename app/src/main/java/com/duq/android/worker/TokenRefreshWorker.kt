@@ -20,10 +20,10 @@ import java.util.concurrent.TimeUnit
  * Background worker that periodically refreshes OAuth tokens.
  *
  * This prevents offline tokens from expiring due to inactivity.
- * Keycloak offlineSessionIdleTimeout is 365 days, we refresh every 25 days
+ * Keycloak offlineSessionIdleTimeout is 30 days, we refresh every 3 days
  * to stay well under that limit.
  *
- * Even if the app is not used for months, tokens stay valid.
+ * As long as device has network access periodically, biometric login works.
  */
 @HiltWorker
 class TokenRefreshWorker @AssistedInject constructor(
@@ -37,8 +37,8 @@ class TokenRefreshWorker @AssistedInject constructor(
         private const val TAG = "TokenRefreshWorker"
         private const val WORK_NAME = "token_refresh_work"
 
-        // Refresh every 25 days (well under 365-day Keycloak timeout)
-        private const val REFRESH_INTERVAL_DAYS = 25L
+        // Refresh every 3 days (well under 30-day Keycloak offline session timeout)
+        private const val REFRESH_INTERVAL_DAYS = 3L
 
         /**
          * Schedule periodic token refresh.
