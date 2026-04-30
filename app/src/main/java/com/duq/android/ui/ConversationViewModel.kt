@@ -63,6 +63,10 @@ class ConversationViewModel @Inject constructor(
     private val _error = MutableStateFlow<DuqError?>(null)
     val error: StateFlow<DuqError?> = _error.asStateFlow()
 
+    // Processing state for text messages (syncs with duck animation)
+    private val _isProcessing = MutableStateFlow(false)
+    val isProcessing: StateFlow<Boolean> = _isProcessing.asStateFlow()
+
     init {
         loadConversationsAndMessages()
     }
@@ -250,6 +254,9 @@ class ConversationViewModel @Inject constructor(
                     webSocketClient.connect()
                 }
 
+                // Start processing state (duck animation)
+                _isProcessing.value = true
+
                 when (val result = duqApiClient.queueTextMessage(authToken, message, userId)) {
                     is DuqApiClient.SendResult.Queued -> {
                         Log.d(TAG, "📨 Message queued, task_id: ${result.taskId}")
@@ -295,8 +302,9 @@ class ConversationViewModel @Inject constructor(
                     is java.io.IOException -> DuqError.NetworkError(e.message ?: "Network error")
                     else -> DuqError.NetworkError("Failed to send message: ${e.message}")
                 }
+            } finally {
+                _isProcessing.value = false
             }
-            // No finally block - no loading state to reset
         }
     }
 

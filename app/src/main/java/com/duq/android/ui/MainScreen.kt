@@ -67,12 +67,19 @@ fun MainScreen(
     val context = LocalContext.current
     var voiceController by remember { mutableStateOf<VoiceServiceController?>(null) }
 
-    val state by voiceController?.state?.collectAsState() ?: remember { mutableStateOf(DuqState.IDLE) }
+    val voiceState by voiceController?.state?.collectAsState() ?: remember { mutableStateOf(DuqState.IDLE) }
     val serviceError by voiceController?.error?.collectAsState() ?: remember { mutableStateOf<DuqError?>(null) }
     val viewModelError by viewModel.error.collectAsState()
+    val isTextProcessing by viewModel.isProcessing.collectAsState()
     val messages by viewModel.messages.collectAsState()
     val conversations by viewModel.conversations.collectAsState()
     val currentConversation by viewModel.currentConversation.collectAsState()
+
+    // Combine voice state with text processing state
+    val state = when {
+        isTextProcessing -> DuqState.PROCESSING
+        else -> voiceState
+    }
 
     // Audio playback state
     val audioPlaybackInfo by audioPlaybackManager.playbackInfo.collectAsState()
