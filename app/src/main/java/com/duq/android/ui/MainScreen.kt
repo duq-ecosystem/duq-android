@@ -184,8 +184,9 @@ fun MainScreen(
                         )
                         isBound = true
                     }
-                    // Always refresh messages when app gains focus
-                    viewModel.refreshMessages()
+                    // Load conversations and messages when app gains focus
+                    // This handles the case where auth token was obtained after ViewModel init
+                    viewModel.loadConversationsAndMessages()
                 }
                 Lifecycle.Event.ON_STOP -> {
                     // Only unbind, don't stop service - it should keep running for WebSocket
