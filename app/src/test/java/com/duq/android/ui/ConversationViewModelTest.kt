@@ -6,6 +6,7 @@ import com.duq.android.data.model.Conversation
 import com.duq.android.data.model.Message
 import com.duq.android.data.model.MessageRole
 import com.duq.android.error.DuqError
+import com.duq.android.network.DuqApiClient
 import io.mockk.*
 import io.mockk.impl.annotations.MockK
 import kotlinx.coroutines.Dispatchers
@@ -29,6 +30,9 @@ class ConversationViewModelTest {
     @MockK
     private lateinit var settingsRepository: SettingsRepository
 
+    @MockK
+    private lateinit var duqApiClient: DuqApiClient
+
     private lateinit var viewModel: ConversationViewModel
     private val testDispatcher = StandardTestDispatcher()
 
@@ -43,14 +47,14 @@ class ConversationViewModelTest {
 
     private val testMessages = listOf(
         Message(
-            id = 1L,
+            id = "msg-1",
             conversationId = "conv-123",
             role = MessageRole.USER,
             content = "Hello",
             createdAt = Instant.now()
         ),
         Message(
-            id = 2L,
+            id = "msg-2",
             conversationId = "conv-123",
             role = MessageRole.ASSISTANT,
             content = "Hi there!",
@@ -78,7 +82,7 @@ class ConversationViewModelTest {
         coEvery { conversationRepository.refreshMessages(any(), any()) } just Runs
         every { conversationRepository.getMessagesFlow(any()) } returns flowOf(testMessages)
 
-        return ConversationViewModel(conversationRepository, settingsRepository)
+        return ConversationViewModel(conversationRepository, settingsRepository, duqApiClient)
     }
 
     @Test
@@ -88,7 +92,7 @@ class ConversationViewModelTest {
         coEvery { conversationRepository.getCurrentConversationId(any()) } returns null
         every { conversationRepository.getMessagesFlow(any()) } returns flowOf(emptyList())
 
-        viewModel = ConversationViewModel(conversationRepository, settingsRepository)
+        viewModel = ConversationViewModel(conversationRepository, settingsRepository, duqApiClient)
         advanceUntilIdle()
 
         assertTrue(viewModel.conversations.value.isEmpty())
@@ -103,7 +107,7 @@ class ConversationViewModelTest {
 
         assertEquals(1, viewModel.conversations.value.size)
         assertEquals(testConversation.id, viewModel.currentConversation.value?.id)
-        coVerify { conversationRepository.getConversations("test-token", false) }
+        coVerify { conversationRepository.getConversations("test-token", true) }
         coVerify { conversationRepository.refreshMessages("test-token", testConversation.id) }
     }
 
@@ -112,7 +116,7 @@ class ConversationViewModelTest {
         coEvery { settingsRepository.getAccessToken() } returns ""
         every { conversationRepository.getMessagesFlow(any()) } returns flowOf(emptyList())
 
-        viewModel = ConversationViewModel(conversationRepository, settingsRepository)
+        viewModel = ConversationViewModel(conversationRepository, settingsRepository, duqApiClient)
         advanceUntilIdle()
 
         assertTrue(viewModel.conversations.value.isEmpty())
@@ -126,7 +130,7 @@ class ConversationViewModelTest {
         coEvery { conversationRepository.getConversations(any(), any()) } throws SocketTimeoutException()
         every { conversationRepository.getMessagesFlow(any()) } returns flowOf(emptyList())
 
-        viewModel = ConversationViewModel(conversationRepository, settingsRepository)
+        viewModel = ConversationViewModel(conversationRepository, settingsRepository, duqApiClient)
         advanceUntilIdle()
 
         assertTrue(viewModel.error.value is DuqError.NetworkError)
@@ -139,7 +143,7 @@ class ConversationViewModelTest {
         coEvery { conversationRepository.getConversations(any(), any()) } throws UnknownHostException()
         every { conversationRepository.getMessagesFlow(any()) } returns flowOf(emptyList())
 
-        viewModel = ConversationViewModel(conversationRepository, settingsRepository)
+        viewModel = ConversationViewModel(conversationRepository, settingsRepository, duqApiClient)
         advanceUntilIdle()
 
         assertTrue(viewModel.error.value is DuqError.NetworkError)
@@ -235,7 +239,7 @@ class ConversationViewModelTest {
         coEvery { conversationRepository.getConversations(any(), any()) } throws SocketTimeoutException()
         every { conversationRepository.getMessagesFlow(any()) } returns flowOf(emptyList())
 
-        viewModel = ConversationViewModel(conversationRepository, settingsRepository)
+        viewModel = ConversationViewModel(conversationRepository, settingsRepository, duqApiClient)
         advanceUntilIdle()
 
         assertNotNull(viewModel.error.value)
@@ -256,7 +260,7 @@ class ConversationViewModelTest {
         coEvery { conversationRepository.refreshMessages(any(), any()) } just Runs
         every { conversationRepository.getMessagesFlow(any()) } returns flowOf(testMessages)
 
-        viewModel = ConversationViewModel(conversationRepository, settingsRepository)
+        viewModel = ConversationViewModel(conversationRepository, settingsRepository, duqApiClient)
 
         // After init completes
         advanceUntilIdle()

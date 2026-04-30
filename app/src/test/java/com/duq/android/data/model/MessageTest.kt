@@ -45,7 +45,7 @@ class MessageTest {
     fun `Message data class holds values correctly`() {
         val now = Instant.now()
         val message = Message(
-            id = 1L,
+            id = "msg-1",
             conversationId = "conv-123",
             role = MessageRole.USER,
             content = "Hello, Duq!",
@@ -55,7 +55,7 @@ class MessageTest {
             createdAt = now
         )
 
-        assertEquals(1L, message.id)
+        assertEquals("msg-1", message.id)
         assertEquals("conv-123", message.conversationId)
         assertEquals(MessageRole.USER, message.role)
         assertEquals("Hello, Duq!", message.content)
@@ -68,7 +68,7 @@ class MessageTest {
     @Test
     fun `Message with audio metadata`() {
         val message = Message(
-            id = 2L,
+            id = "msg-2",
             conversationId = "conv-123",
             role = MessageRole.ASSISTANT,
             content = "Hello! How can I help?",
@@ -86,7 +86,7 @@ class MessageTest {
     @Test
     fun `Message copy preserves values`() {
         val original = Message(
-            id = 1L,
+            id = "msg-1",
             conversationId = "conv-123",
             role = MessageRole.USER,
             content = "Original",
@@ -105,8 +105,8 @@ class MessageTest {
     @Test
     fun `Message equals works correctly`() {
         val now = Instant.now()
-        val msg1 = Message(1L, "conv", MessageRole.USER, "Hi", createdAt = now)
-        val msg2 = Message(1L, "conv", MessageRole.USER, "Hi", createdAt = now)
+        val msg1 = Message("msg-1", "conv", MessageRole.USER, "Hi", createdAt = now)
+        val msg2 = Message("msg-1", "conv", MessageRole.USER, "Hi", createdAt = now)
 
         assertEquals(msg1, msg2)
         assertEquals(msg1.hashCode(), msg2.hashCode())
