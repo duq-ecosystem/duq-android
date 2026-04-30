@@ -37,7 +37,6 @@ class TokenRefreshInterceptor @Inject constructor(
     companion object {
         private const val TAG = "TokenRefreshInterceptor"
         private const val REFRESH_WAIT_TIMEOUT_MS = 30_000L
-        private const val TOKEN_EXPIRY_BUFFER_MS = 60_000L  // Refresh if expires in < 60s
     }
 
     // Prevent multiple concurrent token refreshes
@@ -117,8 +116,8 @@ class TokenRefreshInterceptor @Inject constructor(
         val now = System.currentTimeMillis()
         val timeUntilExpiry = expiresAt - now
 
-        // If token expires in less than 60 seconds, refresh it proactively
-        if (timeUntilExpiry < TOKEN_EXPIRY_BUFFER_MS) {
+        // If token expires soon, refresh it proactively
+        if (timeUntilExpiry < AppConfig.TOKEN_EXPIRY_BUFFER_MS) {
             Log.d(TAG, "Token expires in ${timeUntilExpiry / 1000}s, refreshing proactively")
 
             // Try to acquire refresh lock

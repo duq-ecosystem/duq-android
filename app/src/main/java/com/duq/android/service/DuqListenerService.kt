@@ -37,8 +37,6 @@ class DuqListenerService : Service(), VoiceServiceController {
         private const val TAG = "DuqListenerService"
         const val ACTION_START = "com.duq.android.START"
         const val ACTION_STOP = "com.duq.android.STOP"
-        // 10 minute timeout - renewed during active operation
-        private const val WAKE_LOCK_TIMEOUT_MS = 10 * 60 * 1000L
     }
 
     @Inject lateinit var settingsRepository: SettingsRepository
@@ -278,7 +276,7 @@ class DuqListenerService : Service(), VoiceServiceController {
         )
         // Acquire with 10-minute timeout for safety (prevents battery drain if service crashes)
         // The wake lock is renewed automatically by the periodic wake word processing
-        wakeLock?.acquire(WAKE_LOCK_TIMEOUT_MS)
+        wakeLock?.acquire(AppConfig.WAKE_LOCK_TIMEOUT_MS)
     }
 
     /**
@@ -290,7 +288,7 @@ class DuqListenerService : Service(), VoiceServiceController {
             if (it.isHeld) {
                 it.release()
             }
-            it.acquire(WAKE_LOCK_TIMEOUT_MS)
+            it.acquire(AppConfig.WAKE_LOCK_TIMEOUT_MS)
         }
     }
 

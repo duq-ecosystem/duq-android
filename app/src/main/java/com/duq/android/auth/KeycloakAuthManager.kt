@@ -435,8 +435,7 @@ class KeycloakAuthManager @Inject constructor(
      * Checks if the current token needs refresh
      */
     fun isTokenExpired(expiresAt: Long): Boolean {
-        // Add 60 seconds buffer
-        return System.currentTimeMillis() >= (expiresAt - 60000)
+        return System.currentTimeMillis() >= (expiresAt - AppConfig.TOKEN_EXPIRY_BUFFER_MS)
     }
 
     fun dispose() {

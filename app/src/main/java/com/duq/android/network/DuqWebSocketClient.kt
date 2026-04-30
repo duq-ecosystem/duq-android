@@ -54,8 +54,6 @@ class DuqWebSocketClient @Inject constructor(
         }
 
         // Reconnection settings
-        private const val INITIAL_RECONNECT_DELAY_MS = 1000L
-        private const val MAX_RECONNECT_DELAY_MS = 30000L
         private const val RECONNECT_MULTIPLIER = 2.0
     }
 
@@ -269,8 +267,8 @@ class DuqWebSocketClient @Inject constructor(
     }
 
     private fun calculateReconnectDelay(): Long {
-        val delay = INITIAL_RECONNECT_DELAY_MS * Math.pow(RECONNECT_MULTIPLIER, reconnectAttempt.toDouble())
-        return delay.toLong().coerceAtMost(MAX_RECONNECT_DELAY_MS)
+        val delay = AppConfig.INITIAL_RETRY_DELAY_MS * Math.pow(RECONNECT_MULTIPLIER, reconnectAttempt.toDouble())
+        return delay.toLong().coerceAtMost(AppConfig.MAX_RETRY_DELAY_MS)
     }
 
     /**

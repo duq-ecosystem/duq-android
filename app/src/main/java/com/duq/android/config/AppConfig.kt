@@ -48,6 +48,7 @@ object AppConfig {
     const val AUTH_TIMEOUT_S = 10L
     const val AUTH_TIMEOUT_MS = AUTH_TIMEOUT_S * 1000  // For HttpURLConnection (uses Int ms)
     const val DEFAULT_TOKEN_EXPIRES_S = 300  // 5 minutes
+    const val TOKEN_EXPIRY_BUFFER_MS = 60_000L  // Refresh if expires in < 60s
 
     // Pagination
     const val DEFAULT_MESSAGES_LIMIT = 50

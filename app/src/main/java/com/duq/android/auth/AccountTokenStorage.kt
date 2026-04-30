@@ -4,6 +4,7 @@ import android.accounts.Account
 import android.accounts.AccountManager
 import android.content.Context
 import android.util.Log
+import com.duq.android.config.AppConfig
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -255,11 +256,11 @@ class AccountTokenStorage @Inject constructor(
     }
 
     /**
-     * Check if token is expired (with 60s buffer).
+     * Check if token is expired (with buffer for refresh).
      */
     fun isTokenExpired(): Boolean {
         val expiresAt = getExpiresAt()
-        return System.currentTimeMillis() >= (expiresAt - 60000)
+        return System.currentTimeMillis() >= (expiresAt - AppConfig.TOKEN_EXPIRY_BUFFER_MS)
     }
 
     /**
