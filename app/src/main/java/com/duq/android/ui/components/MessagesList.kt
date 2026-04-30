@@ -7,8 +7,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.Text
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -41,25 +41,20 @@ fun MessagesList(
     onAudioPlayPauseClick: (String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
+    // Reverse the messages so newest is first (for reverseLayout)
+    val reversedMessages = remember(messages) { messages.asReversed() }
     val listState = rememberLazyListState()
 
-    // Track previous message count to detect initial load vs new messages
-    var previousMessageCount by remember { mutableIntStateOf(0) }
+    // Track message count to detect new messages
+    var lastMessageCount by remember { mutableIntStateOf(0) }
 
-    // Scroll to bottom: instant on initial load, animated for new messages
+    // Animate scroll to bottom when new message arrives
     LaunchedEffect(messages.size) {
-        if (messages.isNotEmpty()) {
-            val isInitialLoad = previousMessageCount == 0
-            previousMessageCount = messages.size
-
-            if (isInitialLoad) {
-                // Initial load - instant scroll, no animation
-                listState.scrollToItem(messages.size - 1)
-            } else {
-                // New message arrived - smooth scroll
-                listState.animateScrollToItem(messages.size - 1)
-            }
+        if (messages.size > lastMessageCount && lastMessageCount > 0) {
+            // New message - animate to bottom (index 0 in reversed list)
+            listState.animateScrollToItem(0)
         }
+        lastMessageCount = messages.size
     }
 
     Box(modifier = modifier.fillMaxSize()) {
@@ -75,12 +70,15 @@ fun MessagesList(
                     .padding(16.dp)
             )
         } else {
+            // reverseLayout = true means item[0] is at BOTTOM
+            // So we reverse messages: newest first, displayed at bottom
             LazyColumn(
                 state = listState,
                 modifier = Modifier.fillMaxSize(),
+                reverseLayout = true,
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                items(messages, key = { it.id }) { message ->
+                items(reversedMessages, key = { it.id }) { message ->
                     // Determine audio state for this specific message
                     val isCurrentlyPlaying = audioPlaybackInfo.messageId == message.id
                     val audioState = if (isCurrentlyPlaying) {
