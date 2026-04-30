@@ -218,13 +218,14 @@ class ConversationViewModel @Inject constructor(
 
     /**
      * Send a text message to Duq via WebSocket (no polling!)
+     * Uses optimistic update - message appears immediately, no loading spinner.
      */
     fun sendTextMessage(message: String) {
         if (message.isBlank()) return
 
         viewModelScope.launch {
             try {
-                _isLoading.value = true
+                // NO loading indicator - optimistic update shows message immediately
                 _error.value = null
 
                 val authToken = settingsRepository.getAccessToken()
@@ -301,9 +302,8 @@ class ConversationViewModel @Inject constructor(
                     is java.io.IOException -> DuqError.NetworkError(e.message ?: "Network error")
                     else -> DuqError.NetworkError("Failed to send message: ${e.message}")
                 }
-            } finally {
-                _isLoading.value = false
             }
+            // No finally block - no loading state to reset
         }
     }
 
