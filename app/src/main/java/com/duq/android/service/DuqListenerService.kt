@@ -200,9 +200,12 @@ class DuqListenerService : Service(), VoiceServiceController {
             }
 
             Log.d(TAG, "Creating new WakeWordManager instance...")
+            val sensitivity = settingsRepository.getWakeWordSensitivitySync()
+            Log.d(TAG, "Wake word sensitivity: $sensitivity")
             wakeWordManager = wakeWordManagerFactory.create(
                 context = this@DuqListenerService,
                 accessKey = apiKey,
+                sensitivity = sensitivity,
                 onWakeWordDetected = { onWakeWordDetected() },
                 onError = { errorMessage ->
                     Log.e(TAG, "❌ Wake word error: $errorMessage")

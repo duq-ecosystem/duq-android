@@ -39,6 +39,16 @@ class SettingsRepository(
         // EncryptedSharedPreferences keys (for non-token data only)
         private const val KEY_PORCUPINE_API_KEY = "porcupine_api_key"
         private const val KEY_DEVICE_ID = "device_id"
+
+        // User-configurable settings keys
+        private const val KEY_WAKE_WORD_SENSITIVITY = "wake_word_sensitivity"
+        private const val KEY_SILENCE_TIMEOUT_MS = "silence_timeout_ms"
+        private const val KEY_MAX_RECORDING_MS = "max_recording_ms"
+
+        // Defaults
+        const val DEFAULT_WAKE_WORD_SENSITIVITY = 0.9f
+        const val DEFAULT_SILENCE_TIMEOUT_MS = 2000L
+        const val DEFAULT_MAX_RECORDING_MS = 10000L
     }
 
     // Lazy initialization of AccountTokenStorage if not injected
@@ -165,6 +175,41 @@ class SettingsRepository(
 
     val hasValidSettings: Flow<Boolean> = flow {
         emit(tokenStorage.isAuthenticated())
+    }
+
+    // ========== USER-CONFIGURABLE SETTINGS ==========
+
+    val wakeWordSensitivity: Flow<Float> = flow {
+        emit(encryptedPrefs.getFloat(KEY_WAKE_WORD_SENSITIVITY, DEFAULT_WAKE_WORD_SENSITIVITY))
+    }
+
+    val silenceTimeoutMs: Flow<Long> = flow {
+        emit(encryptedPrefs.getLong(KEY_SILENCE_TIMEOUT_MS, DEFAULT_SILENCE_TIMEOUT_MS))
+    }
+
+    val maxRecordingMs: Flow<Long> = flow {
+        emit(encryptedPrefs.getLong(KEY_MAX_RECORDING_MS, DEFAULT_MAX_RECORDING_MS))
+    }
+
+    fun getWakeWordSensitivitySync(): Float =
+        encryptedPrefs.getFloat(KEY_WAKE_WORD_SENSITIVITY, DEFAULT_WAKE_WORD_SENSITIVITY)
+
+    fun getSilenceTimeoutMsSync(): Long =
+        encryptedPrefs.getLong(KEY_SILENCE_TIMEOUT_MS, DEFAULT_SILENCE_TIMEOUT_MS)
+
+    fun getMaxRecordingMsSync(): Long =
+        encryptedPrefs.getLong(KEY_MAX_RECORDING_MS, DEFAULT_MAX_RECORDING_MS)
+
+    fun saveWakeWordSensitivity(value: Float) {
+        encryptedPrefs.edit().putFloat(KEY_WAKE_WORD_SENSITIVITY, value.coerceIn(0.5f, 1.0f)).apply()
+    }
+
+    fun saveSilenceTimeoutMs(value: Long) {
+        encryptedPrefs.edit().putLong(KEY_SILENCE_TIMEOUT_MS, value.coerceIn(1000L, 4000L)).apply()
+    }
+
+    fun saveMaxRecordingMs(value: Long) {
+        encryptedPrefs.edit().putLong(KEY_MAX_RECORDING_MS, value.coerceIn(5000L, 30000L)).apply()
     }
 
     // ========== SYNCHRONOUS METHODS (for OkHttp Interceptor) ==========

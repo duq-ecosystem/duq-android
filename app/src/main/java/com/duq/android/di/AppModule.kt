@@ -103,9 +103,14 @@ object AppModule {
     @Provides
     fun provideAudioRecorder(
         @ApplicationContext context: Context,
-        vad: VoiceActivityDetectorInterface
+        vad: VoiceActivityDetectorInterface,
+        settingsRepository: SettingsRepository
     ): AudioRecorderInterface {
-        return AudioRecorder(context, vad)
+        return AudioRecorder(
+            context = context,
+            vad = vad,
+            maxRecordingMs = settingsRepository.getMaxRecordingMsSync()
+        )
     }
 
     @Provides
@@ -117,9 +122,13 @@ object AppModule {
 
     @Provides
     fun provideVoiceActivityDetector(
-        @ApplicationContext context: Context
+        @ApplicationContext context: Context,
+        settingsRepository: SettingsRepository
     ): VoiceActivityDetectorInterface {
-        return VoiceActivityDetector(context)
+        return VoiceActivityDetector(
+            context = context,
+            silenceTimeoutMs = settingsRepository.getSilenceTimeoutMsSync()
+        )
     }
 
     @Provides

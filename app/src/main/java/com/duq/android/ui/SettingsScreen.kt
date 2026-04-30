@@ -1,8 +1,10 @@
 package com.duq.android.ui
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -17,6 +19,7 @@ import com.duq.android.R
 import com.duq.android.auth.KeycloakAuthManager
 import com.duq.android.data.SettingsRepository
 import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -29,6 +32,26 @@ fun SettingsScreen(onSettingsSaved: () -> Unit) {
     val savedAccessToken by settingsRepository.accessToken.collectAsState(initial = "")
     val savedUsername by settingsRepository.username.collectAsState(initial = "")
     val savedUserEmail by settingsRepository.userEmail.collectAsState(initial = "")
+
+    // User-configurable settings
+    val savedWakeWordSensitivity by settingsRepository.wakeWordSensitivity.collectAsState(
+        initial = SettingsRepository.DEFAULT_WAKE_WORD_SENSITIVITY
+    )
+    val savedSilenceTimeout by settingsRepository.silenceTimeoutMs.collectAsState(
+        initial = SettingsRepository.DEFAULT_SILENCE_TIMEOUT_MS
+    )
+    val savedMaxRecording by settingsRepository.maxRecordingMs.collectAsState(
+        initial = SettingsRepository.DEFAULT_MAX_RECORDING_MS
+    )
+
+    var wakeWordSensitivity by remember { mutableFloatStateOf(savedWakeWordSensitivity) }
+    var silenceTimeoutMs by remember { mutableFloatStateOf(savedSilenceTimeout.toFloat()) }
+    var maxRecordingMs by remember { mutableFloatStateOf(savedMaxRecording.toFloat()) }
+
+    // Sync with saved values when they load
+    LaunchedEffect(savedWakeWordSensitivity) { wakeWordSensitivity = savedWakeWordSensitivity }
+    LaunchedEffect(savedSilenceTimeout) { silenceTimeoutMs = savedSilenceTimeout.toFloat() }
+    LaunchedEffect(savedMaxRecording) { maxRecordingMs = savedMaxRecording.toFloat() }
 
     var isAuthenticating by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
@@ -54,6 +77,7 @@ fun SettingsScreen(onSettingsSaved: () -> Unit) {
                 .fillMaxSize()
                 .padding(paddingValues)
                 .padding(16.dp)
+                .verticalScroll(rememberScrollState())
         ) {
             // Auth Status Card
             Card(
@@ -277,6 +301,85 @@ fun SettingsScreen(onSettingsSaved: () -> Unit) {
                 }
             }
 
+            // Voice Settings Section
+            Spacer(modifier = Modifier.height(32.dp))
+
+            Text(
+                text = "Voice Settings",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.primary
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Wake Word Sensitivity
+            Text(
+                text = "Wake Word Sensitivity: ${(wakeWordSensitivity * 100).roundToInt()}%",
+                style = MaterialTheme.typography.bodyMedium
+            )
+            Text(
+                text = "Higher = more sensitive, may trigger accidentally",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Slider(
+                value = wakeWordSensitivity,
+                onValueChange = { wakeWordSensitivity = it },
+                onValueChangeFinished = {
+                    settingsRepository.saveWakeWordSensitivity(wakeWordSensitivity)
+                },
+                valueRange = 0.5f..1.0f,
+                steps = 9,
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Silence Timeout
+            Text(
+                text = "Pause Timeout: ${(silenceTimeoutMs / 1000).roundToInt()} sec",
+                style = MaterialTheme.typography.bodyMedium
+            )
+            Text(
+                text = "How long to wait after you stop speaking",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Slider(
+                value = silenceTimeoutMs,
+                onValueChange = { silenceTimeoutMs = it },
+                onValueChangeFinished = {
+                    settingsRepository.saveSilenceTimeoutMs(silenceTimeoutMs.toLong())
+                },
+                valueRange = 1000f..4000f,
+                steps = 5,
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Max Recording Duration
+            Text(
+                text = "Max Recording: ${(maxRecordingMs / 1000).roundToInt()} sec",
+                style = MaterialTheme.typography.bodyMedium
+            )
+            Text(
+                text = "Maximum voice message length",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Slider(
+                value = maxRecordingMs,
+                onValueChange = { maxRecordingMs = it },
+                onValueChangeFinished = {
+                    settingsRepository.saveMaxRecordingMs(maxRecordingMs.toLong())
+                },
+                valueRange = 5000f..30000f,
+                steps = 4,
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            Spacer(modifier = Modifier.height(32.dp))
         }
     }
 }

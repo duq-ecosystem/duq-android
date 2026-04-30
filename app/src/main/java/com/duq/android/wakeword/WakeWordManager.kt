@@ -15,6 +15,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 class WakeWordManager(
     private val context: Context,
     private val accessKey: String,
+    private val sensitivity: Float = AppConfig.WAKE_WORD_SENSITIVITY,
     private val onWakeWordDetected: () -> Unit,
     private val onError: (String) -> Unit
 ) {
@@ -40,7 +41,7 @@ class WakeWordManager(
         try {
             val builder = PorcupineManager.Builder()
                 .setAccessKey(accessKey)
-                .setSensitivity(AppConfig.WAKE_WORD_SENSITIVITY)
+                .setSensitivity(sensitivity)
 
             // Try to load custom "hey duq" wake word file
             val customKeywordPath = getCustomKeywordPath()
