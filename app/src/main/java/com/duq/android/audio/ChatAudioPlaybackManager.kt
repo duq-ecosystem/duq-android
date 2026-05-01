@@ -349,4 +349,27 @@ class ChatAudioPlaybackManager @Inject constructor(
         audioCacheDir.listFiles()?.forEach { it.delete() }
         Log.d(TAG, "Audio cache cleared")
     }
+
+    /**
+     * Save audio data to cache (e.g., from WebSocket message)
+     * Returns true if successfully saved
+     */
+    fun saveToCache(messageId: String, audioData: ByteArray): Boolean {
+        return try {
+            val cachedFile = getCachedAudioFile(messageId)
+            FileOutputStream(cachedFile).use { it.write(audioData) }
+            Log.d(TAG, "✅ Cached WebSocket audio for message $messageId (${audioData.size} bytes)")
+            true
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Failed to cache audio: ${e.message}", e)
+            false
+        }
+    }
+
+    /**
+     * Check if audio is cached for a message
+     */
+    fun isCached(messageId: String): Boolean {
+        return getCachedAudioFile(messageId).exists()
+    }
 }

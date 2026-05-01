@@ -1,8 +1,10 @@
 package com.duq.android.ui
 
+import android.util.Base64
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.duq.android.audio.ChatAudioPlaybackManager
 import com.duq.android.config.AppConfig
 import com.duq.android.data.ConversationRepository
 import com.duq.android.data.SettingsRepository
@@ -30,7 +32,8 @@ class ConversationViewModel @Inject constructor(
     private val conversationRepository: ConversationRepository,
     private val settingsRepository: SettingsRepository,
     private val duqApiClient: DuqApiClient,
-    private val webSocketClient: DuqWebSocketClient
+    private val webSocketClient: DuqWebSocketClient,
+    private val audioPlaybackManager: ChatAudioPlaybackManager
 ) : ViewModel() {
 
     companion object {
@@ -95,13 +98,30 @@ class ConversationViewModel @Inject constructor(
                 val text = message.text ?: return@collect
                 if (text.isNotBlank()) {
                     val hasVoice = !message.voiceData.isNullOrEmpty()
-                    Log.d(TAG, "📥 Adding WebSocket message: ${text.take(50)}..., hasVoice=$hasVoice")
+                    Log.d(TAG, "📥 Adding WebSocket message: ${text.take(50)}..., hasVoice=$hasVoice, waveform=${message.waveform?.size ?: 0} points")
 
-                    conversationRepository.insertLocalMessage(
+                    // Generate temp message ID for this message
+                    val tempMessageId = "temp-${java.util.UUID.randomUUID()}"
+
+                    // Save audio to cache if present (for offline playback)
+                    if (hasVoice && message.voiceData != null) {
+                        try {
+                            val audioBytes = Base64.decode(message.voiceData, Base64.DEFAULT)
+                            audioPlaybackManager.saveToCache(tempMessageId, audioBytes)
+                            Log.d(TAG, "🎵 Cached WebSocket audio: ${audioBytes.size} bytes")
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Failed to cache audio: ${e.message}")
+                        }
+                    }
+
+                    conversationRepository.insertLocalMessageWithId(
+                        messageId = tempMessageId,
                         conversationId = conversationId,
                         content = text,
                         role = "assistant",
-                        hasAudio = hasVoice
+                        hasAudio = hasVoice,
+                        waveform = message.waveform,
+                        audioDurationMs = message.audioDurationMs
                     )
 
                     Log.d(TAG, "✅ Real-time sync: assistant message added to UI")

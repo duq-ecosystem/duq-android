@@ -221,7 +221,9 @@ class ConversationRepository @Inject constructor(
         conversationId: String,
         content: String,
         role: String = "user",
-        hasAudio: Boolean = false
+        hasAudio: Boolean = false,
+        waveform: List<Float>? = null,
+        audioDurationMs: Int? = null
     ): Boolean {
         return try {
             // CRITICAL: Check if conversation exists in DB (FK constraint)
@@ -232,10 +234,16 @@ class ConversationRepository @Inject constructor(
                 return false
             }
 
-            // Generate placeholder waveform for voice messages
-            val waveformJson = if (hasAudio) {
-                "[0.3,0.5,0.7,0.4,0.6,0.8,0.5,0.3,0.6,0.7,0.5,0.4,0.6,0.8,0.5,0.3]"
-            } else null
+            // Use real waveform if provided, otherwise generate placeholder for voice messages
+            val waveformJson = when {
+                waveform != null && waveform.isNotEmpty() -> {
+                    com.google.gson.Gson().toJson(waveform)
+                }
+                hasAudio -> {
+                    "[0.3,0.5,0.7,0.4,0.6,0.8,0.5,0.3,0.6,0.7,0.5,0.4,0.6,0.8,0.5,0.3]"
+                }
+                else -> null
+            }
 
             val tempId = "temp-${java.util.UUID.randomUUID()}" // Temp ID to avoid conflicts
             val entity = MessageEntity(
@@ -244,12 +252,61 @@ class ConversationRepository @Inject constructor(
                 role = role,
                 content = content,
                 hasAudio = hasAudio,
-                audioDurationMs = if (hasAudio) 1000 else null, // Placeholder duration
+                audioDurationMs = audioDurationMs ?: if (hasAudio) 1000 else null,
                 waveform = waveformJson,
                 createdAt = System.currentTimeMillis() / 1000
             )
             messageDao.insertMessage(entity)
-            Log.d(TAG, "✅ Inserted local message with temp id: $tempId, hasAudio=$hasAudio")
+            Log.d(TAG, "✅ Inserted local message with temp id: $tempId, hasAudio=$hasAudio, waveform=${waveform?.size ?: 0} points")
+            true
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ FAILED to insert local message: ${e.message}", e)
+            false
+        }
+    }
+
+    /**
+     * Insert a local message with a specific ID (for WebSocket messages with cached audio).
+     * The ID must match the cached audio file ID.
+     */
+    suspend fun insertLocalMessageWithId(
+        messageId: String,
+        conversationId: String,
+        content: String,
+        role: String = "user",
+        hasAudio: Boolean = false,
+        waveform: List<Float>? = null,
+        audioDurationMs: Int? = null
+    ): Boolean {
+        return try {
+            val conversationExists = conversationDao.getConversationById(conversationId) != null
+            if (!conversationExists) {
+                Log.e(TAG, "❌ CANNOT insert message - conversation $conversationId NOT in local DB!")
+                return false
+            }
+
+            val waveformJson = when {
+                waveform != null && waveform.isNotEmpty() -> {
+                    com.google.gson.Gson().toJson(waveform)
+                }
+                hasAudio -> {
+                    "[0.3,0.5,0.7,0.4,0.6,0.8,0.5,0.3,0.6,0.7,0.5,0.4,0.6,0.8,0.5,0.3]"
+                }
+                else -> null
+            }
+
+            val entity = MessageEntity(
+                id = messageId,
+                conversationId = conversationId,
+                role = role,
+                content = content,
+                hasAudio = hasAudio,
+                audioDurationMs = audioDurationMs ?: if (hasAudio) 1000 else null,
+                waveform = waveformJson,
+                createdAt = System.currentTimeMillis() / 1000
+            )
+            messageDao.insertMessage(entity)
+            Log.d(TAG, "✅ Inserted local message with id: $messageId, hasAudio=$hasAudio")
             true
         } catch (e: Exception) {
             Log.e(TAG, "❌ FAILED to insert local message: ${e.message}", e)
