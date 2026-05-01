@@ -220,7 +220,8 @@ class ConversationRepository @Inject constructor(
     suspend fun insertLocalMessage(
         conversationId: String,
         content: String,
-        role: String = "user"
+        role: String = "user",
+        hasAudio: Boolean = false
     ): Boolean {
         return try {
             // CRITICAL: Check if conversation exists in DB (FK constraint)
@@ -231,19 +232,24 @@ class ConversationRepository @Inject constructor(
                 return false
             }
 
+            // Generate placeholder waveform for voice messages
+            val waveformJson = if (hasAudio) {
+                "[0.3,0.5,0.7,0.4,0.6,0.8,0.5,0.3,0.6,0.7,0.5,0.4,0.6,0.8,0.5,0.3]"
+            } else null
+
             val tempId = "temp-${java.util.UUID.randomUUID()}" // Temp ID to avoid conflicts
             val entity = MessageEntity(
                 id = tempId,
                 conversationId = conversationId,
                 role = role,
                 content = content,
-                hasAudio = false,
-                audioDurationMs = null,
-                waveform = null,
+                hasAudio = hasAudio,
+                audioDurationMs = if (hasAudio) 1000 else null, // Placeholder duration
+                waveform = waveformJson,
                 createdAt = System.currentTimeMillis() / 1000
             )
             messageDao.insertMessage(entity)
-            Log.d(TAG, "✅ Inserted local message with temp id: $tempId for conversation: $conversationId")
+            Log.d(TAG, "✅ Inserted local message with temp id: $tempId, hasAudio=$hasAudio")
             true
         } catch (e: Exception) {
             Log.e(TAG, "❌ FAILED to insert local message: ${e.message}", e)

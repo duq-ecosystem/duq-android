@@ -94,12 +94,14 @@ class ConversationViewModel @Inject constructor(
                 // Flow will automatically update UI
                 val text = message.text ?: return@collect
                 if (text.isNotBlank()) {
-                    Log.d(TAG, "📥 Adding WebSocket message to conversation: ${text.take(50)}...")
+                    val hasVoice = !message.voiceData.isNullOrEmpty()
+                    Log.d(TAG, "📥 Adding WebSocket message: ${text.take(50)}..., hasVoice=$hasVoice")
 
                     conversationRepository.insertLocalMessage(
                         conversationId = conversationId,
                         content = text,
-                        role = "assistant"
+                        role = "assistant",
+                        hasAudio = hasVoice
                     )
 
                     Log.d(TAG, "✅ Real-time sync: assistant message added to UI")
