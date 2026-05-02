@@ -104,7 +104,9 @@ fun MainScreen(
                 message = error.toDisplayMessage(),
                 withDismissAction = true
             )
+            // Clear both ViewModel and service errors to prevent re-showing
             viewModel.clearError()
+            voiceController?.clearError()
         }
     }
 
