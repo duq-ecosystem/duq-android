@@ -47,7 +47,7 @@ Java_com_duq_android_audio_WhisperLocal_nativeTranscribe(
     wparams.print_special          = false;
     wparams.single_segment         = false;
     wparams.temperature            = 0.0f;
-    wparams.condition_on_initial_text = false;    // зеркалит серверный condition_on_previous_text=false
+    wparams.no_context             = true;        // зеркалит серверный condition_on_previous_text=false
 
     std::string out;
     if (whisper_full(ctx, wparams, pcm.data(), (int) pcm.size()) == 0) {
