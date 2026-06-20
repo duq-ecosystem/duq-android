@@ -646,20 +646,11 @@ class OpenClawGatewayClient @Inject constructor(
         return out
     }
 
-    suspend fun transcribeAudio(file: File): String {
-        // On-device whisper.cpp when enabled; on any failure fall back to server /stt.
-        if (AppConfig.STT_ON_DEVICE) {
-            try {
-                if (!whisper.isModelReady()) whisper.ensureModel()
-                if (whisper.isModelReady()) {
-                    val text = whisper.transcribeWav(file)
-                    if (text.isNotBlank()) return text
-                    logger.w(TAG, "on-device STT empty, falling back to server")
-                }
-            } catch (e: Exception) {
-                logger.w(TAG, "on-device STT failed (${e.message}), falling back to server")
-            }
-        }
+    suspend fun transcribeAudio(file: File): String =
+        whisper.tryTranscribe(file) ?: transcribeAudioOnServer(file)
+
+    /** Серверный /stt fallback (faster-whisper за nginx). */
+    private suspend fun transcribeAudioOnServer(file: File): String {
         val body = MultipartBody.Builder().setType(MultipartBody.FORM)
             .addFormDataPart("model", "whisper-1")
             .addFormDataPart("language", "ru")

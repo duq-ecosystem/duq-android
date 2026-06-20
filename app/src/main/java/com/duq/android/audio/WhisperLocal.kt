@@ -39,6 +39,18 @@ class WhisperLocal @Inject constructor(
     @Volatile private var ctxPtr: Long = 0L
     private val lock = Any()
 
+    init {
+        // Модель переиспользуется между вызовами (init дорогой), но при нехватке RAM
+        // система просит её выгрузить — отдаём ~0.5 ГБ назад, потом перезагрузим лениво.
+        context.registerComponentCallbacks(object : android.content.ComponentCallbacks2 {
+            override fun onTrimMemory(level: Int) {
+                if (level >= android.content.ComponentCallbacks2.TRIM_MEMORY_COMPLETE) release()
+            }
+            override fun onLowMemory() = release()
+            override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {}
+        })
+    }
+
     private val httpClient by lazy {
         OkHttpClient.Builder()
             .connectTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
@@ -94,6 +106,25 @@ class WhisperLocal @Inject constructor(
         }
     }
 
+    /**
+     * Единая точка on-device распознавания для всех вызывающих (node/gateway клиенты).
+     * Возвращает текст ИЛИ null — если STT_ON_DEVICE выключен, модель не готова (и не
+     * докачалась), либо распознавание упало/пусто. На null вызывающий уходит на
+     * серверный /stt. Инкапсулирует флаг + докачку + fallback в ОДНОМ месте, чтобы
+     * клиенты не дублировали эту логику.
+     */
+    suspend fun tryTranscribe(file: File): String? {
+        if (!AppConfig.STT_ON_DEVICE) return null
+        return try {
+            if (!isModelReady()) ensureModel()
+            if (!isModelReady()) return null
+            transcribeWav(file).takeIf { it.isNotBlank() }
+        } catch (e: Exception) {
+            Log.w(TAG, "on-device STT failed, falling back to server: ${e.message}")
+            null
+        }
+    }
+
     /** Транскрибирует 16 kHz mono PCM16 WAV-файл в текст. Бросает при пустом результате. */
     suspend fun transcribeWav(file: File): String = withContext(Dispatchers.Default) {
         val pcm = readWavToFloat(file)
@@ -103,6 +134,7 @@ class WhisperLocal @Inject constructor(
         text.trim()
     }
 
+    /** Выгружает модель из нативной памяти (~0.5 ГБ). Зовётся системой при нехватке RAM. */
     fun release() {
         synchronized(lock) { if (ctxPtr != 0L) { nativeFree(ctxPtr); ctxPtr = 0L } }
     }

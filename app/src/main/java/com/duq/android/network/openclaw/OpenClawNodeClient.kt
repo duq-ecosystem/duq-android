@@ -362,21 +362,8 @@ class OpenClawNodeClient @Inject constructor(
     }
 
     /** Transcribes a WAV: on-device whisper.cpp when enabled, else server /stt fallback. */
-    private suspend fun transcribe(file: File): String {
-        if (AppConfig.STT_ON_DEVICE) {
-            try {
-                if (!whisper.isModelReady()) whisper.ensureModel()
-                if (whisper.isModelReady()) {
-                    val text = whisper.transcribeWav(file)
-                    if (text.isNotBlank()) return text
-                    logger.w(TAG, "on-device STT empty, falling back to server")
-                }
-            } catch (e: Exception) {
-                logger.w(TAG, "on-device STT failed (${e.message}), falling back to server")
-            }
-        }
-        return transcribeOnServer(file)
-    }
+    private suspend fun transcribe(file: File): String =
+        whisper.tryTranscribe(file) ?: transcribeOnServer(file)
 
     /** Uploads a WAV to the server STT endpoint and returns the transcript text. */
     private suspend fun transcribeOnServer(file: File): String = withContext(Dispatchers.IO) {
