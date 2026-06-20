@@ -87,6 +87,14 @@ android {
         val ghReleaseToken = System.getenv("GH_RELEASE_TOKEN")
             ?: localProperties.getProperty("GH_RELEASE_TOKEN", "")
         buildConfigField("String", "GH_RELEASE_TOKEN", "\"$ghReleaseToken\"")
+
+        // Edge-токен периметра: nginx проверяет его (X-Auth-Token) на ВСЕХ серверных
+        // эндпоинтах, без него → 401 → fail2ban банит IP. = vault-sync token (тот же,
+        // что шлёт Obsidian-плагин). CI передаёт секрет SERVER_TOKEN; локальная сборка
+        // читает local.properties. Пусто → заголовок не шлётся (отладка до гейта).
+        val serverToken = System.getenv("SERVER_TOKEN")
+            ?: localProperties.getProperty("SERVER_TOKEN", "")
+        buildConfigField("String", "SERVER_TOKEN", "\"$serverToken\"")
     }
 
     buildTypes {

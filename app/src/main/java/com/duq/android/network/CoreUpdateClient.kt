@@ -63,7 +63,7 @@ class CoreUpdateClient @Inject constructor(
 
     /** Current + latest core version, updateAvailable, and in-progress flag. */
     suspend fun status(): Status? = withContext(Dispatchers.IO) {
-        val request = Request.Builder().url(AppConfig.CORE_UPDATE_STATUS_URL).get().build()
+        val request = Request.Builder().url(AppConfig.CORE_UPDATE_STATUS_URL).withServerAuth().get().build()
         runCatching {
             client.newCall(request).execute().use { resp ->
                 if (!resp.isSuccessful) return@use null
@@ -82,6 +82,7 @@ class CoreUpdateClient @Inject constructor(
     suspend fun run(): RunResult = withContext(Dispatchers.IO) {
         val request = Request.Builder()
             .url(AppConfig.CORE_UPDATE_RUN_URL)
+            .withServerAuth()
             .post(ByteArray(0).toRequestBody())
             .build()
         runCatching {

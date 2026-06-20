@@ -33,6 +33,12 @@ object AppConfig {
     // time from CI secret / local.properties — NOT committed. Empty → updater disabled.
     val UPDATE_GITHUB_TOKEN: String get() = com.duq.android.BuildConfig.GH_RELEASE_TOKEN
 
+    // Edge-токен периметра: шлётся как X-Auth-Token на ВСЕ серверные запросы (TTS, STT,
+    // core-update, gateway WS). nginx проверяет его на входе; нет токена → 401 → fail2ban
+    // банит IP. = vault-sync token. Пусто (нет секрета в сборке) → заголовок не добавляется.
+    val SERVER_TOKEN: String get() = com.duq.android.BuildConfig.SERVER_TOKEN
+    const val SERVER_TOKEN_HEADER = "X-Auth-Token"
+
     // Network timeouts (seconds)
     const val CONNECT_TIMEOUT_S = 30L
     const val READ_TIMEOUT_S = 60L

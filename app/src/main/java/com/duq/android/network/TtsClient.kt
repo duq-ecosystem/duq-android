@@ -40,7 +40,7 @@ class TtsClient @Inject constructor(
     suspend fun synthesize(text: String, messageId: String): File? = withContext(Dispatchers.IO) {
         context.cacheDir.listFiles { f -> f.name.startsWith(TTS_PREFIX) }?.forEach { it.delete() }
         val body = FormBody.Builder().add("text", text).build()
-        val request = Request.Builder().url(AppConfig.TTS_URL).post(body).build()
+        val request = Request.Builder().url(AppConfig.TTS_URL).withServerAuth().post(body).build()
         client.newCall(request).execute().use { resp ->
             if (!resp.isSuccessful) return@withContext null
             val bytes = resp.body?.bytes() ?: return@withContext null

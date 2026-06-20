@@ -5,6 +5,7 @@ import com.duq.android.auth.DeviceIdentityManager
 import com.duq.android.config.AppConfig
 import com.duq.android.data.SettingsRepository
 import com.duq.android.logging.Logger
+import com.duq.android.network.withServerAuth
 import com.google.gson.Gson
 import com.google.gson.GsonBuilder
 import com.google.gson.reflect.TypeToken
@@ -221,7 +222,7 @@ class OpenClawGatewayClient @Inject constructor(
         _connectionState.value = GatewayConnectionState.CONNECTING
         logger.d(TAG, "Connecting to $url (paired=${deviceToken.isNotBlank()})")
 
-        val request = Request.Builder().url(url).build()
+        val request = Request.Builder().url(url).withServerAuth().build()
         val connectAuth = if (deviceToken.isNotBlank()) mapOf("deviceToken" to deviceToken) else mapOf()
         currentConnectAuth = connectAuth
         ensureFrameConsumer()
@@ -262,7 +263,7 @@ class OpenClawGatewayClient @Inject constructor(
         isManualStop.set(false)
         _connectionState.value = GatewayConnectionState.PAIRING
 
-        val request = Request.Builder().url(gatewayUrl).build()
+        val request = Request.Builder().url(gatewayUrl).withServerAuth().build()
         var pairingWs: WebSocket? = null
         val result = CompletableDeferred<Boolean>()
         // When PAIRING_REQUIRED, we intentionally close this socket and hand off
@@ -353,7 +354,7 @@ class OpenClawGatewayClient @Inject constructor(
         repeat(60) { attempt ->
             delay(5000)
             val retryResult = CompletableDeferred<Boolean?>()
-            val req = Request.Builder().url(gatewayUrl).build()
+            val req = Request.Builder().url(gatewayUrl).withServerAuth().build()
             httpClient.newWebSocket(req, object : WebSocketListener() {
                 override fun onOpen(ws: WebSocket, response: Response) {}
                 override fun onMessage(ws: WebSocket, text: String) {
@@ -663,7 +664,7 @@ class OpenClawGatewayClient @Inject constructor(
             .addFormDataPart("language", "ru")
             .addFormDataPart("file", file.name, file.asRequestBody("audio/wav".toMediaType()))
             .build()
-        val req = Request.Builder().url(AppConfig.STT_URL).post(body).build()
+        val req = Request.Builder().url(AppConfig.STT_URL).withServerAuth().post(body).build()
         // Reuse the shared client's connection pool + dispatcher; only override the
         // read timeout for this call. Building a fresh OkHttpClient per request
         // leaked a thread pool + connection pool on every voice command.

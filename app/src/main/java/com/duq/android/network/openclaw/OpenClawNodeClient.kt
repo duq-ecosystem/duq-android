@@ -7,6 +7,7 @@ import com.duq.android.config.AppConfig
 import com.duq.android.data.SettingsRepository
 import com.duq.android.location.LocationDataSource
 import com.duq.android.logging.Logger
+import com.duq.android.network.withServerAuth
 import com.duq.android.screen.ScreenCaptureManager
 import com.duq.android.screen.ScreenRecorder
 import com.duq.android.service.DuqListenerService
@@ -167,7 +168,7 @@ class OpenClawNodeClient @Inject constructor(
             else -> "none"
         }
         logger.d(TAG, "Node connecting to $url (auth=$authVia)")
-        val request = Request.Builder().url(url).build()
+        val request = Request.Builder().url(url).withServerAuth().build()
         webSocket = httpClient.newWebSocket(request, object : WebSocketListener() {
             override fun onOpen(ws: WebSocket, response: Response) {
                 logger.d(TAG, "Node WS open, waiting for challenge...")
@@ -399,7 +400,7 @@ class OpenClawNodeClient @Inject constructor(
             .addFormDataPart("language", "ru")
             .addFormDataPart("file", file.name, file.asRequestBody("audio/wav".toMediaType()))
             .build()
-        val req = Request.Builder().url(AppConfig.STT_URL).post(body).build()
+        val req = Request.Builder().url(AppConfig.STT_URL).withServerAuth().post(body).build()
         sttClient.newCall(req).execute().use { resp ->
             if (!resp.isSuccessful) throw Exception("STT ${resp.code}")
             val text = JSONObject(resp.body?.string() ?: "{}").optString("text", "")
