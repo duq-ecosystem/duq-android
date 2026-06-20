@@ -141,19 +141,32 @@ class OpenClawNodeClient @Inject constructor(
         if (!isConnecting.compareAndSet(false, true)) return
         val url = settings.getGatewayUrl()
         val nodeToken = settings.getNodeToken()
+        val operatorToken = settings.getDeviceToken()
         val bootstrap = settings.getBootstrapToken()
-        // Device tokens are role-bound (operator token ≠ node token). Once we have a
-        // node token, reconnect with it. Otherwise authenticate with the BOOTSTRAP
-        // on the SAME identity the operator already redeemed it on: the bound
-        // setup-profile (roles=[node,operator]) triggers silent node pairing and the
-        // gateway issues a node token in hello-ok auth.deviceTokens[].
+        // Auth precedence is durability-ordered (fixes "node постоянно слетает", 2026-06-20):
+        //   1) node token — role-bound, long-lived; the steady-state reconnect.
+        //   2) operator device-token — ALSO long-lived and on the SAME Ed25519 identity
+        //      (node+operator share keyName="operator"). When the node token is missing
+        //      (fresh key / never approved / revoked), authenticate with it: the gateway
+        //      keys node-pairing off the signed device.id (reconcileNodePairingOnConnect),
+        //      so a valid device signature re-opens a NODE-level pending for approval.
+        //   3) bootstrap — LAST resort, only for the very first pairing before any device
+        //      token exists. It has a 10-min TTL; relying on it after that window expires
+        //      is exactly what wedged the node forever in bootstrap_token_invalid.
         currentAuth = when {
             nodeToken.isNotBlank() -> mapOf("deviceToken" to nodeToken)
+            operatorToken.isNotBlank() -> mapOf("deviceToken" to operatorToken)
             bootstrap.isNotBlank() -> mapOf("bootstrapToken" to bootstrap)
             else -> emptyMap()
         }
         _state.value = GatewayConnectionState.CONNECTING
-        logger.d(TAG, "Node connecting to $url (nodeToken=${nodeToken.isNotBlank()} bootstrap=${bootstrap.isNotBlank()})")
+        val authVia = when {
+            nodeToken.isNotBlank() -> "node-token"
+            operatorToken.isNotBlank() -> "operator-token"
+            bootstrap.isNotBlank() -> "bootstrap"
+            else -> "none"
+        }
+        logger.d(TAG, "Node connecting to $url (auth=$authVia)")
         val request = Request.Builder().url(url).build()
         webSocket = httpClient.newWebSocket(request, object : WebSocketListener() {
             override fun onOpen(ws: WebSocket, response: Response) {
