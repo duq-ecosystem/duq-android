@@ -163,9 +163,18 @@ targetSDK34). Фикс: типы `location`/`camera` добавляются в F
 
 ## Голосовой ввод/вывод (operator) — push-to-talk
 
+**STT — ON-DEVICE (whisper.cpp), 2026-06-20, e2e-проверено.** Распознавание перенесено
+с сервера (faster-whisper :8765, 2-CPU VPS) на телефон: whisper.cpp (submodule v1.9.1) +
+JNI-мост `libduqwhisper.so` (`app/src/main/cpp/`, CMake/NDK arm64), модель `ggml-small-q5_1`
+(multilingual ru, ~190MB) докачивается в filesDir при первом голосе. `WhisperLocal` парсит
+16kHz mono PCM16 WAV → float32 → `whisper_full(language=ru)`. За флагом `AppConfig.STT_ON_DEVICE`
+(true); **fallback на серверный `/stt` при любой ошибке**. Замена в `transcribe()` обоих клиентов
+(`OpenClawNodeClient` + `OpenClawGatewayClient`). Проверено: голос распознан на телефоне,
+серверный :8765 — 0 запросов. Разгружает VPS, латентность ниже, голос не покидает устройство.
+
 **Push-to-talk (hold-to-talk), VERIFIED на устройстве:** зажать **утку** (`DuqDuck`)
 на главном экране → запись без VAD-обрезки (`AudioRecorder.record(file, useVad=false)`,
-паузы НЕ режут) → отпустить → STT (`/stt/v1/audio/transcriptions`) → транскрипт
+паузы НЕ режут) → отпустить → STT (on-device whisper, fallback `/stt`) → транскрипт
 добавляется как user-сообщение в чат → ответ стримится. Управление в
 `ConversationViewModel` (startVoiceInput/stopVoiceInput/cancelVoiceInput); жест —
 `pointerInput` на утке (release=send, cancel=discard). Утка анимируется при записи.
@@ -221,11 +230,18 @@ Push в `master`/`main` →
 3. **GitHub Release** `build-<run_number>` (**НЕ prerelease**, `make_latest`) с APK + version.json
 4. Ссылка в Telegram, артефакты
 
-**Автообновление — НАПРЯМУЮ с GitHub Releases** (репо публичный). `AppUpdater` читает
-`releases/latest/download/version.json` и качает `app-release.apk` оттуда же (CDN).
-**VPS-канал больше НЕ используется** (мёртвый IP / flaky SSH ушли). `UpdateWorker`
-(WorkManager) — фоновая проверка каждые 6ч + при старте. Установка — **PackageInstaller
-Session API** (юзер подтверждает; silent install в Android невозможен без root/owner).
+**Автообновление — через GitHub API ПРИВАТНОГО монорепо `duq-ecosystem/duq-next-generation`**
+(2026-06-20, e2e-проверено: v207 сам подтянул build-208 → установился). Репо приватный, поэтому
+анонимный `releases/latest/download/*` отдаёт 401 — `AppUpdater` ходит в **GitHub API**
+(`api.github.com/repos/.../releases/latest`) с **read-only токеном** (`Authorization: Bearer`):
+- `versionCode` берётся из тега релиза `build-<code>` (не из version.json);
+- APK качается как **release-asset `app-release.apk` по его id** с `Accept: application/octet-stream`;
+- токен инжектится в `BuildConfig.GH_RELEASE_TOKEN` из CI-секрета `GH_RELEASE_TOKEN` (env-first,
+  пустой → апдейтер тихо отключается). ⚠️ Сейчас там ШИРОКИЙ gh-токен (Danny принял риск,
+  не сужать — [[duq-gh-token-dont-nag]]).
+**VPS-канал и публичный duq-android больше НЕ используются.** `UpdateWorker` (WorkManager) —
+фоновая проверка каждые 6ч + при старте. Установка — **PackageInstaller Session API**
+(юзер подтверждает; silent install в Android невозможен без root/owner).
 - `versionCode` = `github.run_number` (репо переехал на duq-ecosystem; run_number уже
   выше legacy 56 — оффсет НЕ нужен; job-level `env: DUQ_VERSION_CODE: ${{ ... + N }}`
   ЛОМАЕТ workflow — startup_failure).
