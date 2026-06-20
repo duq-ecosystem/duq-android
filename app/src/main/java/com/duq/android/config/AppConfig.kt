@@ -1,4 +1,3 @@
-// self-update e2e: build 208 bump
 package com.duq.android.config
 
 /**
