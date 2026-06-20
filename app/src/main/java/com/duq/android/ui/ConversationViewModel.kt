@@ -8,6 +8,7 @@ import com.duq.android.audio.AudioRecorderInterface
 import com.duq.android.audio.ChatAudioPlaybackManager
 import com.duq.android.data.model.Message
 import com.duq.android.data.model.MessageRole
+import com.duq.android.data.model.VoicePhase
 import com.duq.android.error.DuqError
 import com.duq.android.network.openclaw.GatewayConnectionState
 import com.duq.android.network.openclaw.OcAgentStep
@@ -92,6 +93,21 @@ class ConversationViewModel @Inject constructor(
     // Push-to-talk recording coroutine; record() suspends until stopVoiceInput()
     // flips the recorder, then the same coroutine runs STT + send.
     private var recordingJob: Job? = null
+
+    // Id исходящего голосового пузыря, который стримит фазы (запись → распознавание)
+    // прямо в чате, пока идёт ввод. По готовности он же становится обычным сообщением.
+    private var pendingVoiceMsgId: String? = null
+
+    private fun updatePendingVoice(transform: (Message) -> Message) {
+        val id = pendingVoiceMsgId ?: return
+        _messages.update { list -> list.map { if (it.id == id) transform(it) else it } }
+    }
+
+    private fun removePendingVoice() {
+        val id = pendingVoiceMsgId ?: return
+        _messages.update { list -> list.filterNot { it.id == id } }
+        pendingVoiceMsgId = null
+    }
 
     // Whether the turn currently being answered came from voice — drives contextual
     // TTS (speak the reply only when the user spoke, never for typed messages).
@@ -368,33 +384,50 @@ class ConversationViewModel @Inject constructor(
     fun startVoiceInput() {
         if (recordingJob != null) return
         _voiceInput.value = VoiceInputState.RECORDING
+        // Исходящий пузырь появляется СРАЗУ и стримит фазы (запись → распознавание)
+        // внутри себя — как блок tool-use у ответа бота, а не надписью за уткой.
+        val msgId = java.util.UUID.randomUUID().toString()
+        pendingVoiceMsgId = msgId
+        _messages.update {
+            it + Message(
+                id = msgId, role = MessageRole.USER, content = "",
+                voicePhase = VoicePhase.RECORDING, isStreaming = true
+            )
+        }
         recordingJob = viewModelScope.launch {
             val file = File(context.cacheDir, "ptt_input.wav")
             try {
                 // useVad=false: hold-to-talk — the user controls the endpoint, so
                 // natural pauses must not cut the recording short.
                 val captured = audioRecorder.record(file, useVad = false)
-                if (!captured) return@launch
+                if (!captured) { removePendingVoice(); return@launch }
 
                 _voiceInput.value = VoiceInputState.TRANSCRIBING
+                updatePendingVoice { it.copy(voicePhase = VoicePhase.TRANSCRIBING) }
                 val transcript = gatewayClient.transcribeAudio(file)
-                if (transcript.isBlank()) return@launch
+                if (transcript.isBlank()) { removePendingVoice(); return@launch }
 
-                _messages.update { it + Message(role = MessageRole.USER, content = transcript) }
+                // Фаза гаснет — пузырь становится обычным сообщением с транскриптом.
+                updatePendingVoice {
+                    it.copy(content = transcript, voicePhase = null, isStreaming = false)
+                }
                 // Mark BEFORE sending: the reply's first delta can arrive before
                 // sendMessage() returns, and the delta handler reads this flag.
                 lastInputWasVoice = true
                 gatewayClient.sendMessage(transcript)
                 armReplyWatchdog()
             } catch (e: CancellationException) {
+                removePendingVoice()
                 throw e // user cancelled (slide-away / background) — not an error
             } catch (e: Exception) {
+                removePendingVoice()
                 Log.e(TAG, "Voice input failed: ${e.message}")
                 _error.value = DuqError.NetworkError(e.message ?: "Voice input failed")
             } finally {
                 file.delete()
                 _voiceInput.value = VoiceInputState.IDLE
                 recordingJob = null
+                pendingVoiceMsgId = null
             }
         }
     }

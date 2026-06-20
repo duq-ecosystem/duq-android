@@ -26,6 +26,10 @@ import androidx.compose.ui.unit.sp
 import com.duq.android.data.model.Message
 import com.duq.android.data.model.MessageRole
 import com.duq.android.data.model.MessageStep
+import com.duq.android.data.model.VoicePhase
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.text.font.FontStyle
 import dev.chrisbanes.haze.hazeEffect
 import com.duq.android.ui.theme.DuqColors
 import java.time.format.DateTimeFormatter
@@ -212,7 +216,11 @@ fun MessageBubble(
                 }
 
                 // Message content
-                if (!isUser && (isStreaming || message.content.isNotEmpty())) {
+                if (isUser && message.voicePhase != null) {
+                    // Исходящий голосовой пузырь стримит фазу ввода (запись → распознавание),
+                    // как блок tool-use у ответа бота — без надписи за уткой.
+                    VoicePhaseBlock(phase = message.voicePhase)
+                } else if (!isUser && (isStreaming || message.content.isNotEmpty())) {
                     StreamingText(
                         text = message.content,
                         isStreaming = isStreaming,
@@ -380,5 +388,54 @@ private fun TypingIndicator() {
                     )
             )
         }
+    }
+}
+
+/**
+ * Live-блок фазы голосового ввода внутри ИСХОДЯЩЕГО пузыря — аналог tool-use блока
+ * у ответа бота, но для своей реплики: «Слушаю…» с пульсирующей красной точкой
+ * (идёт запись) → «Распознаю речь…» со спиннером (on-device whisper). Когда фаза
+ * заканчивается, ViewModel заменяет её финальным транскриптом — блок исчезает.
+ */
+@Composable
+private fun VoicePhaseBlock(phase: VoicePhase) {
+    val label = when (phase) {
+        VoicePhase.RECORDING -> "Слушаю…"
+        VoicePhase.TRANSCRIBING -> "Распознаю речь…"
+    }
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        when (phase) {
+            VoicePhase.RECORDING -> {
+                val t = rememberInfiniteTransition(label = "recDot")
+                val a by t.animateFloat(
+                    initialValue = 0.3f, targetValue = 1f,
+                    animationSpec = infiniteRepeatable(
+                        tween(600, easing = FastOutSlowInEasing), RepeatMode.Reverse
+                    ),
+                    label = "recDotAlpha"
+                )
+                Box(
+                    Modifier
+                        .size(11.dp)
+                        .alpha(a)
+                        .clip(CircleShape)
+                        .background(DuqColors.error)
+                )
+            }
+            VoicePhase.TRANSCRIBING -> {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(15.dp),
+                    color = Color(0xFF7C4DFF),
+                    strokeWidth = 2.dp
+                )
+            }
+        }
+        Spacer(Modifier.width(10.dp))
+        Text(
+            text = label,
+            color = DuqColors.textPrimary,
+            fontSize = 15.sp,
+            fontStyle = FontStyle.Italic
+        )
     }
 }

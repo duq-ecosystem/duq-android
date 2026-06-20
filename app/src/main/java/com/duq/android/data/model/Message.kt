@@ -42,5 +42,13 @@ data class Message(
     val waveform: List<Float>? = null,
     val isStreaming: Boolean = false,
     val steps: List<MessageStep> = emptyList(),
+    val voicePhase: VoicePhase? = null,
     val createdAt: Instant = Instant.now()
 )
+
+/**
+ * Фаза голосового ввода для ИСХОДЯЩЕГО (user) пузыря. Пока юзер говорит и идёт
+ * on-device распознавание, пузырь стримит фазу (как tool-steps у ответа бота),
+ * затем фаза гаснет и пузырь показывает финальный транскрипт.
+ */
+enum class VoicePhase { RECORDING, TRANSCRIBING }
