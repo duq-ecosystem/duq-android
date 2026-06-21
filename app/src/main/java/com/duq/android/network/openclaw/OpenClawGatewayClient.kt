@@ -648,10 +648,25 @@ class OpenClawGatewayClient @Inject constructor(
             val text = extractMessageText(m["message"] ?: m)
                 ?: (m["text"] as? String)
                 ?: return@mapNotNull null
+            // Service-injected user events are not real messages — the engine pushes
+            // cron payloads and heartbeat polls into the session as role:"user" rows
+            // ("[cron:<id> <name>] …", "[OpenClaw heartbeat poll]"). They'd otherwise
+            // render the raw cron prompt/instruction as a user bubble in the chat.
+            if (role == "user" && isServiceEvent(text)) return@mapNotNull null
             if (text.isBlank()) null else OcHistoryMsg(role, text)
         }
         logger.d(TAG, "chat.history: parsed ${out.size}/${rows.size} rows")
         return out
+    }
+
+    /**
+     * True for engine-injected service rows that masquerade as `role:"user"` but are
+     * NOT messages from Denis: cron payloads ("[cron:<id> <name>] …") and heartbeat
+     * polls ("[OpenClaw heartbeat poll]"). They must never render as user bubbles.
+     */
+    private fun isServiceEvent(text: String): Boolean {
+        val t = text.trimStart()
+        return t.startsWith("[cron:") || t.startsWith("[OpenClaw")
     }
 
     suspend fun transcribeAudio(file: File): String =
