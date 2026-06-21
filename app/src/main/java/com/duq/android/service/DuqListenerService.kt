@@ -11,8 +11,7 @@ import com.duq.android.BuildConfig
 import com.duq.android.DuqState
 import com.duq.android.data.SettingsRepository
 import com.duq.android.error.DuqError
-import com.duq.android.location.LocationReporter
-import com.duq.android.network.openclaw.OpenClawGatewayClient
+import com.duq.android.network.duq.DuqChatClient
 import com.duq.android.wakeword.WakeWordManager
 import com.duq.android.wakeword.WakeWordManagerFactory
 import dagger.hilt.android.AndroidEntryPoint
@@ -71,10 +70,10 @@ class DuqListenerService : Service(), VoiceServiceController {
     @Inject lateinit var settingsRepository: SettingsRepository
     @Inject lateinit var notificationManager: DuqNotificationManager
     @Inject lateinit var voiceCommandProcessor: VoiceCommandProcessor
-    @Inject lateinit var gatewayClient: OpenClawGatewayClient
-    @Inject lateinit var nodeClient: com.duq.android.network.openclaw.OpenClawNodeClient
+    // ЧАТ (Ф3a) — новый клиент ядра DUQ. phone-control (node) и репорт локации
+    // остаются на OpenClaw и подключаются в Ф3b — здесь сознательно не используются.
+    @Inject lateinit var gatewayClient: DuqChatClient
     @Inject lateinit var wakeWordManagerFactory: WakeWordManagerFactory
-    @Inject lateinit var locationReporter: LocationReporter
 
     private val binder = LocalBinder()
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -111,10 +110,9 @@ class DuqListenerService : Service(), VoiceServiceController {
         instance = this
         Log.d(TAG, "SERVICE CREATED — lean WS mode")
         voiceCommandProcessor.initializePlayer()
-        gatewayClient.start()      // operator session: phone → bot (chat)
-        nodeClient.start()         // node session: bot → phone (node.invoke commands)
+        gatewayClient.start()      // чат: телефон → ядро DUQ (REST + поллинг)
         collectIncomingMessages()
-        locationReporter.start(serviceScope)
+        // node-сессия (bot→phone) и репорт локации — на OpenClaw, подключаются в Ф3b.
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -263,9 +261,7 @@ class DuqListenerService : Service(), VoiceServiceController {
         wakeWordManager?.stop(); wakeWordManager = null
         voiceCommandProcessor.stopRecording()
         voiceCommandProcessor.releasePlayer()
-        locationReporter.stop()
         gatewayClient.stop()
-        nodeClient.stop()
         serviceScope.cancel()
         instance = null
         super.onDestroy()

@@ -10,10 +10,10 @@ import com.duq.android.data.model.Message
 import com.duq.android.data.model.MessageRole
 import com.duq.android.data.model.VoicePhase
 import com.duq.android.error.DuqError
+import com.duq.android.network.duq.DuqChatClient
 import com.duq.android.network.openclaw.GatewayConnectionState
 import com.duq.android.network.openclaw.OcAgentStep
 import com.duq.android.network.openclaw.OcChatEvent
-import com.duq.android.network.openclaw.OpenClawGatewayClient
 import com.duq.android.update.AppUpdater
 import com.duq.android.util.ReplyText
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -31,7 +31,7 @@ enum class VoiceInputState { IDLE, RECORDING, TRANSCRIBING }
 @HiltViewModel
 class ConversationViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
-    private val gatewayClient: OpenClawGatewayClient,
+    private val gatewayClient: DuqChatClient,
     private val audioPlaybackManager: ChatAudioPlaybackManager,
     private val audioRecorder: AudioRecorderInterface,
     private val ttsClient: com.duq.android.network.TtsClient,
