@@ -17,8 +17,8 @@ import javax.inject.Singleton
 
 /**
  * Client for the backend core-update handle (ручка). Lets the «Движок» screen show
- * the current/available OpenClaw core version and trigger a CONTROLLED update
- * (scripts/update-openclaw.sh on the VPS — updates the core WITHOUT touching the
+ * the current/available core version and trigger a CONTROLLED update
+ * (scripts/update-core.sh on the VPS — git pull + compose rebuild of the
  * memory index), NOT the engine's naive npm self-update which breaks local memory.
  *
  * HTTP/1.1 pinned (same as TtsClient): OkHttp HTTP/2 can stall behind nginx. /run
@@ -37,7 +37,7 @@ class CoreUpdateClient @Inject constructor(
         @SerializedName("updateAvailable") val updateAvailable: Boolean = false,
         val running: Boolean = false,
         val log: String = "",
-        // self-check движка после апдейта (пишет update-openclaw.sh) — для уведомления.
+        // self-check после апдейта (пишет update-core.sh) — для уведомления.
         val result: Result? = null,
     )
 

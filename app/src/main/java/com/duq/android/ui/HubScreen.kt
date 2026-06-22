@@ -36,26 +36,16 @@ import androidx.compose.ui.unit.sp
 import com.duq.android.ui.theme.DuqColors
 
 /**
- * Пульт — hub-and-spoke вход во все разделы конфигурации OpenClaw.
+ * Пульт — hub-and-spoke вход в разделы конфигурации ядра DUQ.
  * Фаза 1: каркас-плитки с навигацией. Живые метрики и detail-экраны разделов
  * приходят в следующих фазах (см. spec §6). Плитка «Голос» уже ведёт в текущий
  * SettingsScreen (миграция настроек туда — позже).
  */
 data class HubSection(val key: String, val icon: ImageVector, val title: String)
 
-/** Разделы пульта — строго те, под что есть реальный WS-RPC OpenClaw (spec §6). */
+/** Разделы пульта — пока только «Движок» (обновление ядра
+ *  через /core-update). Прежние gateway-RPC разделы убраны — у ядра DUQ нет RPC. */
 val HUB_SECTIONS = listOf(
-    HubSection("agents", Icons.Outlined.SmartToy, "Агенты"),
-    HubSection("models", Icons.Outlined.Psychology, "Модели"),
-    HubSection("cron", Icons.Outlined.Schedule, "Расписания"),
-    HubSection("tasks", Icons.Outlined.Checklist, "Задачи"),
-    HubSection("skills", Icons.Outlined.AutoAwesome, "Навыки"),
-    HubSection("tools", Icons.Outlined.Build, "Инструменты"),
-    HubSection("channels", Icons.Outlined.Hub, "Интеграции"),
-    HubSection("memory", Icons.Outlined.Memory, "Память"),
-    HubSection("usage", Icons.Outlined.Payments, "Расходы"),
-    HubSection("voice", Icons.Outlined.Mic, "Голос"),
-    HubSection("nodes", Icons.Outlined.Devices, "Устройства"),
     HubSection("engine", Icons.Outlined.Tune, "Движок"),
 )
 

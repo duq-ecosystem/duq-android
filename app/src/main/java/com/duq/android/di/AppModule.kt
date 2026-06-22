@@ -5,16 +5,13 @@ import com.duq.android.audio.AudioRecorder
 import com.duq.android.audio.AudioRecorderInterface
 import com.duq.android.audio.VoiceActivityDetector
 import com.duq.android.audio.VoiceActivityDetectorInterface
-import com.duq.android.auth.DeviceIdentityManager
 import com.duq.android.data.SettingsRepository
 import com.duq.android.audio.BeepPlayer
 import com.duq.android.audio.DefaultBeepPlayer
 import com.duq.android.location.FusedLocationDataSource
 import com.duq.android.location.LocationDataSource
-import com.duq.android.location.LocationReporter
 import com.duq.android.logging.FileLogger
 import com.duq.android.logging.Logger
-import com.duq.android.network.openclaw.OpenClawGatewayClient
 import com.duq.android.service.DefaultErrorMapper
 import com.duq.android.service.DuqNotificationManager
 import com.duq.android.service.ErrorMapper
@@ -38,22 +35,8 @@ object AppModule {
 
     @Provides
     @Singleton
-    fun provideDeviceIdentityManager(settings: SettingsRepository): DeviceIdentityManager =
-        DeviceIdentityManager(settings)
-
-    @Provides
-    @Singleton
     fun provideLocationDataSource(@ApplicationContext context: Context): LocationDataSource =
         FusedLocationDataSource(context)
-
-    @Provides
-    @Singleton
-    fun provideLocationReporter(
-        locationDataSource: LocationDataSource,
-        gatewayClient: OpenClawGatewayClient,
-        settingsRepository: SettingsRepository,
-        logger: Logger
-    ): LocationReporter = LocationReporter(locationDataSource, gatewayClient, settingsRepository, logger)
 
     // Singleton: one mic owner shared by the wake-word service flow and the
     // push-to-talk ViewModel flow, so they can't double-open AudioRecord.

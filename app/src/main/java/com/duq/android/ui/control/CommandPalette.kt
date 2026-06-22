@@ -29,7 +29,6 @@ data class PaletteCommand(val icon: androidx.compose.ui.graphics.vector.ImageVec
 private val STATIC_COMMANDS = listOf(
     PaletteCommand(Icons.Outlined.ChatBubbleOutline, "Чат", "tab_chat"),
     PaletteCommand(Icons.Outlined.GridView, "Пульт", "tab_hub"),
-    PaletteCommand(Icons.Outlined.Bolt, "Лента", "tab_activity"),
     PaletteCommand(Icons.Outlined.Settings, "Настройки", "settings"),
 )
 

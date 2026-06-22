@@ -33,17 +33,15 @@ import dagger.hilt.android.EntryPointAccessors
 import dagger.hilt.components.SingletonComponent
 
 sealed class Screen(val route: String) {
-    object Pairing : Screen("pairing")
-    object Shell : Screen("shell")       // bottom-nav оболочка (Чат/Пульт/Лента)
+    object Shell : Screen("shell")       // bottom-nav оболочка (Чат/Пульт)
     object Settings : Screen("settings")
 }
 
-/** Вкладки нижней навигации (spec §3). Контурные монохромные иконки. */
+/** Вкладки нижней навигации. «Лента» убрана (была gateway-RPC). */
 private data class Tab(val route: String, val icon: androidx.compose.ui.graphics.vector.ImageVector, val label: String)
 private val TABS = listOf(
     Tab("tab_hub", Icons.Outlined.GridView, "Пульт"),
     Tab("tab_chat", Icons.Outlined.ChatBubbleOutline, "Чат"),
-    Tab("tab_activity", Icons.Outlined.Bolt, "Лента"),
 )
 // Стартуем с чата (основной экран), несмотря на порядок вкладок в баре.
 private const val START_TAB = "tab_chat"
@@ -69,7 +67,6 @@ fun DuqApp() {
 
     val entryPoint = remember { EntryPointAccessors.fromApplication(context, DuqAppEntryPoint::class.java) }
     val audioPlaybackManager = remember { entryPoint.chatAudioPlaybackManager() }
-    val settings = remember { entryPoint.settingsRepository() }
 
     // The playback manager is an app-scoped @Singleton; its ExoPlayer lives for the
     // process. Do NOT release() it on composable disposal — release() flips an
@@ -77,18 +74,12 @@ fun DuqApp() {
     // DuqApp would leave audio permanently dead. The process teardown frees ExoPlayer.
     LaunchedEffect(Unit) { audioPlaybackManager.initialize() }
 
-    // Use sync value as initial to avoid null flash that routes to PairingScreen (camera open bug)
-    val isPaired by settings.isPaired.collectAsState(initial = settings.isPairedSync())
-    val startDestination = if (isPaired) Screen.Shell.route else Screen.Pairing.route
+    // Ядро DUQ авторизуется build-time edge-токеном (BuildConfig.SERVER_TOKEN) —
+    // устройство НЕ пейрится (Ed25519/bootstrap-пейринг удалены).
+    // Всегда стартуем с оболочки (чат).
+    val startDestination = Screen.Shell.route
 
     NavHost(navController = navController, startDestination = startDestination) {
-        composable(Screen.Pairing.route) {
-            PairingScreen(onPaired = {
-                navController.navigate(Screen.Shell.route) {
-                    popUpTo(Screen.Pairing.route) { inclusive = true }
-                }
-            })
-        }
         composable(Screen.Shell.route) {
             MainShell(
                 audioPlaybackManager = audioPlaybackManager,
@@ -189,7 +180,6 @@ private fun MainShell(
                     onOpenPalette = { showPalette = true }
                 )
             }
-            composable("tab_activity") { ActivityScreen(onOpenPalette = { showPalette = true }) }
             composable("section/{key}") { entry ->
                 val key = entry.arguments?.getString("key") ?: ""
                 com.duq.android.ui.control.SectionScreen(

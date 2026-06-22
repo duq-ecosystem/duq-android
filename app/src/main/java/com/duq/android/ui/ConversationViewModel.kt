@@ -10,10 +10,11 @@ import com.duq.android.data.model.Message
 import com.duq.android.data.model.MessageRole
 import com.duq.android.data.model.VoicePhase
 import com.duq.android.error.DuqError
-import com.duq.android.network.openclaw.GatewayConnectionState
-import com.duq.android.network.openclaw.OcAgentStep
-import com.duq.android.network.openclaw.OcChatEvent
-import com.duq.android.network.openclaw.OpenClawGatewayClient
+import com.duq.android.network.duq.DuqChatClient
+import com.duq.android.network.duq.DuqIncomingMessage
+import com.duq.android.network.duq.GatewayConnectionState
+import com.duq.android.network.duq.OcAgentStep
+import com.duq.android.network.duq.OcChatEvent
 import com.duq.android.update.AppUpdater
 import com.duq.android.util.ReplyText
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -31,7 +32,7 @@ enum class VoiceInputState { IDLE, RECORDING, TRANSCRIBING }
 @HiltViewModel
 class ConversationViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
-    private val gatewayClient: OpenClawGatewayClient,
+    private val gatewayClient: DuqChatClient,
     private val audioPlaybackManager: ChatAudioPlaybackManager,
     private val audioRecorder: AudioRecorderInterface,
     private val ttsClient: com.duq.android.network.TtsClient,
@@ -151,11 +152,33 @@ class ConversationViewModel @Inject constructor(
         override fun removeEldestEntry(eldest: Map.Entry<String, Boolean>) = size > 32
     }
 
+    // Live-синк: серверные id уже отрендеренных push-сообщений (идемпотентность —
+    // один и тот же push/реконнект не задвоит). Bounded LRU.
+    private val seenServerMsgIds = object : LinkedHashMap<String, Boolean>(16, 0.75f, false) {
+        override fun removeEldestEntry(eldest: Map.Entry<String, Boolean>) = size > 128
+    }
+
+    /** Совпадает ли (role, content) с одним из последних сообщений (echo своих
+     *  отправок / уже отрисованного REST-ответа / перекрытия с историей). */
+    private fun isRecentDuplicate(role: MessageRole, content: String): Boolean {
+        val norm = content.trim()
+        return _messages.value.takeLast(8).any { it.role == role && it.content.trim() == norm }
+    }
+
+    /** Live-сообщение беседы из push (/duq/ws): рендерим, если не дубль. */
+    private fun handleIncomingMessage(msg: DuqIncomingMessage) {
+        if (msg.content.isBlank()) return
+        if (seenServerMsgIds.put(msg.messageId, true) != null) return  // уже видели этот id
+        val role = MessageRole.fromApiString(msg.role)
+        if (isRecentDuplicate(role, msg.content)) return  // своё/REST/история — не дублируем
+        _messages.update { it + Message(id = msg.messageId, role = role, content = msg.content) }
+    }
+
     private val flog = com.duq.android.logging.FileLogger(context)
 
     /** An agent the user can switch the chat to (real gateway agent ids + a hint). */
     data class AgentOption(val id: String, val name: String, val desc: String, val emoji: String)
-    // Configured agents on the gateway (openclaw.json agents.list). "main" is the
+    // Configured agents on the gateway (core config). "main" is the
     // default operator chat; the others can be viewed / talked to via the picker.
     val availableAgents = listOf(
         AgentOption("main", "Main", "Главный ассистент", "🤖"),
@@ -176,7 +199,7 @@ class ConversationViewModel @Inject constructor(
      * Restore the chat from the server-side transcript (`chat.history`) once the
      * gateway is connected. The gateway is the single source of truth for history
      * (shared across all devices), so we don't keep a local copy — this is the
-     * openclaw-native way and fixes "chat resets every launch" at the root.
+     * server-as-source-of-truth way and fixes "chat resets every launch" at the root.
      */
     private fun restoreServerHistory() {
         viewModelScope.launch {
@@ -235,6 +258,9 @@ class ConversationViewModel @Inject constructor(
         viewModelScope.launch {
             gatewayClient.agentSteps.collect { step -> handleAgentStep(step) }
         }
+        viewModelScope.launch {
+            gatewayClient.incomingMessages.collect { msg -> handleIncomingMessage(msg) }
+        }
     }
 
     private fun handleAgentStep(step: OcAgentStep) {
@@ -244,7 +270,7 @@ class ConversationViewModel @Inject constructor(
         // just after the chat `final` still upgrade the step's label/kind from the
         // `command` detail to the authoritative `tool` one.
         val finished = step.phase == "end" || step.status == "completed" || step.status == "failed"
-        // openclaw emits up to two items per call (tool + its command/patch detail)
+        // the engine emits up to two items per call (tool + its command/patch detail)
         // sharing one toolCallId — itemId is "tool:<callId>"/"command:<callId>". Key
         // by the callId so the pair collapses into one step (the engine's own model).
         // A tool step is a sign of life too (a cold memory recall can run for tens of
@@ -336,10 +362,15 @@ class ConversationViewModel @Inject constructor(
                 // Also settle any tool steps whose "end" frame never arrived, so the
                 // collapsed block doesn't keep a spinner after the reply is done.
                 _messages.update { msgs ->
-                    val updated = if (msgs.any { it.id == event.runId }) {
-                        msgs.map { if (it.id == event.runId) it.copy(content = finalContent, isStreaming = false) else it }
-                    } else {
-                        msgs + Message(id = event.runId, role = MessageRole.ASSISTANT, content = finalContent, isStreaming = false)
+                    val updated = when {
+                        msgs.any { it.id == event.runId } ->
+                            msgs.map { if (it.id == event.runId) it.copy(content = finalContent, isStreaming = false) else it }
+                        // Live-push мог уже отрисовать этот же ответ (гонка push↔REST) —
+                        // не дублируем по содержимому.
+                        msgs.takeLast(8).any { it.role == MessageRole.ASSISTANT && it.content.trim() == finalContent.trim() } ->
+                            msgs
+                        else ->
+                            msgs + Message(id = event.runId, role = MessageRole.ASSISTANT, content = finalContent, isStreaming = false)
                     }
                     ChatStepReducer.markAllStepsDone(updated, event.runId)
                 }

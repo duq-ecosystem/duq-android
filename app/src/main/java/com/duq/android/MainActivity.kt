@@ -68,7 +68,7 @@ class MainActivity : FragmentActivity() {
         val nm = getSystemService(NotificationManager::class.java)
         lifecycleScope.launch(Dispatchers.IO) {
             AppUpdater(applicationContext, nm.areNotificationsEnabled()).checkAvailable()
-            // Проверка обновления ЯДРА openclaw → пуш «Обновление ядра» с deep-link в «Движок».
+            // Проверка обновления ЯДРА DUQ → пуш «Обновление ядра» с deep-link в «Движок».
             com.duq.android.update.CoreUpdateNotifier.check(applicationContext)
         }
     }

@@ -12,11 +12,21 @@ object AppConfig {
     // Used for contextual TTS: speak a reply only when the user spoke.
     const val TTS_URL = "$BASE_URL/tts"
     // Core-update handle (ручка): backend FastAPI that triggers the CONTROLLED
-    // openclaw core update via scripts/update-openclaw.sh (NOT the engine npm
+    // core update via scripts/update-core.sh (NOT the engine npm
     // self-update — that one breaks local memory). GET status, POST run. The
     // «Движок» screen reads status + the «Обновить ядро» button POSTs run.
     const val CORE_UPDATE_STATUS_URL = "$BASE_URL/core-update/status"
     const val CORE_UPDATE_RUN_URL = "$BASE_URL/core-update/run"
+
+    // ── Ядро DUQ (собственное Python-ядро duq-core за nginx, префикс /duq) ──
+    // Новый контракт чата (Ф3a): POST .../message → task_id, GET .../task/{id} poll,
+    // GET .../conversations[/{id}/messages] — история. Авторизация edge-токеном.
+    const val DUQ_API_BASE_URL = "$BASE_URL/duq/api/"
+    // WS для real-time reasoning-событий (опционально): wss-вариант BASE_URL + /duq/ws.
+    const val DUQ_WS_URL = "wss://on-za-menya.online/duq/ws"
+    // Поллинг задачи: интервал опроса и общий бюджет ожидания ответа ядра.
+    const val DUQ_TASK_POLL_INTERVAL_MS = 1000L
+    const val DUQ_TASK_TIMEOUT_MS = 120_000L
 
     // Log timestamp timezone. The process default resolves to UTC on this device, so
     // FileLogger timestamps were +5h off from Danny's wall clock — pin it explicitly.

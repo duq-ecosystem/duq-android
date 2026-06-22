@@ -8,7 +8,7 @@ import com.duq.android.audio.BeepPlayer
 import com.duq.android.audio.ChatAudioPlaybackManager
 import com.duq.android.config.AppConfig
 import com.duq.android.error.DuqError
-import com.duq.android.network.openclaw.OpenClawGatewayClient
+import com.duq.android.network.duq.DuqChatClient
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
 import javax.inject.Inject
@@ -20,7 +20,7 @@ class VoiceCommandProcessor @Inject constructor(
     private val audioRecorder: AudioRecorderInterface,
     private val chatAudioPlaybackManager: ChatAudioPlaybackManager,
     private val beepPlayer: BeepPlayer,
-    private val gatewayClient: OpenClawGatewayClient,
+    private val gatewayClient: DuqChatClient,
     private val errorMapper: ErrorMapper
 ) {
     companion object { private const val TAG = "VoiceProcessor" }
