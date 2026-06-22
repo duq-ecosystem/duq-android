@@ -170,6 +170,21 @@ class ConversationViewModel @Inject constructor(
         if (msg.content.isBlank()) return
         if (seenServerMsgIds.put(msg.messageId, true) != null) return  // уже видели этот id
         val role = MessageRole.fromApiString(msg.role)
+        // Свой тёрн в полёте: ответ ассистента из push заполняет пузырь-плейсхолдер
+        // (тот же runId, на нём уже live-висят reasoning-шаги) — НЕ плодим второй пузырь
+        // и не теряем шаги. REST-финал (тот же runId) затем идемпотентно заполнит его же.
+        if (role == MessageRole.ASSISTANT) {
+            val rid = currentRunId
+            if (rid != null && _messages.value.any { it.id == rid }) {
+                _messages.update { msgs ->
+                    val upd = msgs.map {
+                        if (it.id == rid) it.copy(content = ReplyText.clean(msg.content), isStreaming = false) else it
+                    }
+                    ChatStepReducer.markAllStepsDone(upd, rid)
+                }
+                return
+            }
+        }
         if (isRecentDuplicate(role, msg.content)) return  // своё/REST/история — не дублируем
         _messages.update { it + Message(id = msg.messageId, role = role, content = msg.content) }
     }

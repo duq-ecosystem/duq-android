@@ -138,6 +138,7 @@ class DuqNodeClient @Inject constructor(
         val toolName = data["tool_name"] as? String
         val message = data["message"] as? String ?: ""
         val iteration = (data["iteration"] as? Number)?.toInt() ?: 0
+        logger.d(TAG, "reasoning $eventType tool=$toolName it=$iteration")
         chatClient.onReasoning(eventType, toolName, message, iteration)
     }
 
