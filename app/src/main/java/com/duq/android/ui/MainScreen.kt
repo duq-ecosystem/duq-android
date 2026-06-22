@@ -106,9 +106,9 @@ fun MainScreen(
     // 🔔 уведомления и 📰 дайджесты — РАЗНЫЕ сущности, разные хранилища.
     val notifItems by viewModel.inboxItems.collectAsState()
     val digestItems by viewModel.digestItems.collectAsState()
-    val activeAgent by viewModel.activeAgent.collectAsState()
-    val activeAgentOption = viewModel.availableAgents.firstOrNull { it.id == activeAgent }
-    val activeAgentLabel = activeAgentOption?.let { "${it.emoji} ${it.name}" } ?: "DUQ"
+    val conversations by viewModel.conversations.collectAsState()
+    val activeConversationId by viewModel.activeConversationId.collectAsState()
+    val activeConversationTitle by viewModel.activeConversationTitle.collectAsState()
     var showInbox by remember { mutableStateOf(false) }
     var showDigest by remember { mutableStateOf(false) }
     // Which inbox/digest row is expanded to full text (null = all collapsed).
@@ -405,7 +405,8 @@ fun MainScreen(
         }
     }
 
-    // Agent picker — switch the chat between agents (main/strain/digest). Default main.
+    // Переключатель диалогов — список бесед из /conversations + «Новый чат».
+    // (Ядро одноагентное: переключаемся между беседами, а не агентами.)
     if (showConversationPicker) {
         ModalBottomSheet(
             onDismissRequest = { showConversationPicker = false },
@@ -418,15 +419,41 @@ fun MainScreen(
                     .padding(horizontal = 16.dp)
                     .padding(bottom = 32.dp)
             ) {
-                Text(
-                    text = "Выбери агента",
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = DuqColors.textPrimary,
-                    modifier = Modifier.padding(bottom = 12.dp)
-                )
-                viewModel.availableAgents.forEach { agent ->
-                    val selected = agent.id == activeAgent
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Диалоги",
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = DuqColors.textPrimary
+                    )
+                    Row(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(DuqColors.primary.copy(alpha = 0.15f))
+                            .clickable {
+                                viewModel.newConversation()
+                                showConversationPicker = false
+                            }
+                            .padding(horizontal = 14.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(text = "＋ Новый чат", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = DuqColors.primary)
+                    }
+                }
+                if (conversations.isEmpty()) {
+                    Text(
+                        text = "Пока нет сохранённых диалогов",
+                        fontSize = 14.sp,
+                        color = DuqColors.textSecondary,
+                        modifier = Modifier.padding(vertical = 12.dp)
+                    )
+                }
+                conversations.forEach { conv ->
+                    val selected = conv.id == activeConversationId
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -434,27 +461,21 @@ fun MainScreen(
                             .clip(RoundedCornerShape(14.dp))
                             .background(if (selected) DuqColors.primary.copy(alpha = 0.15f) else DuqColors.surfaceElevated)
                             .clickable {
-                                viewModel.switchAgent(agent.id)
+                                viewModel.selectConversation(conv.id)
                                 showConversationPicker = false
                             }
                             .padding(horizontal = 16.dp, vertical = 14.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(text = agent.emoji, fontSize = 22.sp)
+                        Text(text = "💬", fontSize = 20.sp)
                         Spacer(modifier = Modifier.width(14.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = agent.name,
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = if (selected) DuqColors.primary else DuqColors.textPrimary
-                            )
-                            Text(
-                                text = agent.desc,
-                                fontSize = 13.sp,
-                                color = DuqColors.textSecondary
-                            )
-                        }
+                        Text(
+                            text = conv.title,
+                            fontSize = 16.sp,
+                            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                            color = if (selected) DuqColors.primary else DuqColors.textPrimary,
+                            modifier = Modifier.weight(1f)
+                        )
                         if (selected) Text(text = "✓", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = DuqColors.primary)
                     }
                 }
@@ -501,19 +522,23 @@ fun MainScreen(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Conversation title (clickable to open picker)
+            // Conversation title (clickable to open the conversation switcher)
             Row(
                 modifier = Modifier
                     .clip(RoundedCornerShape(8.dp))
-                    .clickable { showConversationPicker = true }
+                    .clickable {
+                        viewModel.loadConversations()  // освежить список перед показом
+                        showConversationPicker = true
+                    }
                     .padding(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = activeAgentLabel,
+                    text = activeConversationTitle,
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Medium,
-                    color = DuqColors.textPrimary
+                    color = DuqColors.textPrimary,
+                    maxLines = 1
                 )
                 Text(
                     text = " ▼",

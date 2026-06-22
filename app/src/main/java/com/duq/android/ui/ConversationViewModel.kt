@@ -165,9 +165,20 @@ class ConversationViewModel @Inject constructor(
         return _messages.value.takeLast(8).any { it.role == role && it.content.trim() == norm }
     }
 
-    /** Live-сообщение беседы из push (/duq/ws): рендерим, если не дубль. */
+    /** Live-сообщение беседы из push (/duq/ws): рендерим, если относится к активной
+     *  беседе и не дубль. */
     private fun handleIncomingMessage(msg: DuqIncomingMessage) {
         if (msg.content.isBlank()) return
+        // Фильтр по активной беседе: пуш ДРУГОЙ беседы (напр. из telegram) не льём в
+        // текущий вид. Новый чат (active==null) ещё не знает свой id — первый пуш его
+        // сообщает: усыновляем id и подтягиваем список, чтобы беседа была в переключателе.
+        val active = _activeConversationId.value
+        val convId = msg.conversationId
+        if (active != null && convId != null && convId != active) return
+        if (active == null && convId != null) {
+            _activeConversationId.value = convId
+            loadConversations()
+        }
         if (seenServerMsgIds.put(msg.messageId, true) != null) return  // уже видели этот id
         val role = MessageRole.fromApiString(msg.role)
         // Свой тёрн в полёте: ответ ассистента из push заполняет пузырь-плейсхолдер
@@ -191,23 +202,70 @@ class ConversationViewModel @Inject constructor(
 
     private val flog = com.duq.android.logging.FileLogger(context)
 
-    /** An agent the user can switch the chat to (real gateway agent ids + a hint). */
-    data class AgentOption(val id: String, val name: String, val desc: String, val emoji: String)
-    // Configured agents on the gateway (core config). "main" is the
-    // default operator chat; the others can be viewed / talked to via the picker.
-    val availableAgents = listOf(
-        AgentOption("main", "Main", "Главный ассистент", "🤖"),
-        AgentOption("strain", "Strain", "Сорта · канал weedly", "🌿"),
-        AgentOption("digest", "Digest", "Крипто-макро дайджест", "📰"),
-    )
-    private val _activeAgent = MutableStateFlow("main")
-    val activeAgent: StateFlow<String> = _activeAgent.asStateFlow()
+    // ── Переключатель диалогов (ядро одноагентное → единица переключения = беседа,
+    //    не агент; прежний picker main/strain/digest был мёртв — switchAgent грузил ту
+    //    же историю). Список бесед из /conversations, выбор грузит /messages беседы,
+    //    отправка адресуется в активную беседу (conversation_id), «Новый чат» стартует
+    //    свежую (new_conversation). ──
+    private val _conversations = MutableStateFlow<List<com.duq.android.network.duq.DuqConversation>>(emptyList())
+    val conversations: StateFlow<List<com.duq.android.network.duq.DuqConversation>> = _conversations.asStateFlow()
+
+    // Активная беседа: id (null = новый ещё-не-сохранённый чат) + заголовок для шапки.
+    private val _activeConversationId = MutableStateFlow<String?>(null)
+    val activeConversationId: StateFlow<String?> = _activeConversationId.asStateFlow()
+    private val _activeConversationTitle = MutableStateFlow("DUQ")
+    val activeConversationTitle: StateFlow<String> = _activeConversationTitle.asStateFlow()
+
+    // Следующая отправка должна начать НОВЫЙ диалог (взведено кнопкой «Новый чат»).
+    @Volatile private var pendingNewConversation = false
 
     init {
         gatewayClient.start()
         collectChatEvents()
         refreshUpdateState()
         restoreServerHistory()
+    }
+
+    /** Перечитать список бесед (для переключателя). Тихо игнорит сетевые ошибки. */
+    fun loadConversations() {
+        viewModelScope.launch {
+            val list = runCatching { gatewayClient.listConversations() }.getOrElse {
+                flog.w(TAG, "listConversations failed: ${it.message}"); return@launch
+            }
+            _conversations.value = list
+        }
+    }
+
+    /** Переключиться на беседу: грузим её сообщения, дальнейшая отправка идёт в неё. */
+    fun selectConversation(id: String) {
+        if (id == _activeConversationId.value) return
+        _activeConversationId.value = id
+        pendingNewConversation = false
+        _activeConversationTitle.value = _conversations.value.firstOrNull { it.id == id }?.title ?: "Чат"
+        _messages.value = emptyList()
+        currentRunId = null
+        disarmReplyWatchdog(); _isProcessing.value = false
+        viewModelScope.launch {
+            val history = runCatching { gatewayClient.loadMessages(id) }.getOrElse {
+                flog.e(TAG, "loadMessages($id) failed: ${it.message}", it); emptyList()
+            }
+            // Применяем только если пользователь не переключился снова за время загрузки.
+            if (_activeConversationId.value != id) return@launch
+            _messages.value = history.map {
+                Message(role = MessageRole.fromApiString(it.role), content = it.text)
+            }
+            flog.i(TAG, "selectConversation($id): ${history.size} messages")
+        }
+    }
+
+    /** Начать новый диалог: сбрасываем вид; первое сообщение уйдёт с new_conversation. */
+    fun newConversation() {
+        _activeConversationId.value = null
+        pendingNewConversation = true
+        _activeConversationTitle.value = "Новый чат"
+        _messages.value = emptyList()
+        currentRunId = null
+        disarmReplyWatchdog(); _isProcessing.value = false
     }
 
     /**
@@ -219,10 +277,18 @@ class ConversationViewModel @Inject constructor(
     private fun restoreServerHistory() {
         viewModelScope.launch {
             connectionState.first { it == GatewayConnectionState.CONNECTED }
-            val history = runCatching { gatewayClient.fetchHistory() }.getOrElse {
-                flog.e(TAG, "fetchHistory failed: ${it.message}", it); emptyList()
+            val list = runCatching { gatewayClient.listConversations() }.getOrElse {
+                flog.e(TAG, "listConversations failed: ${it.message}", it); emptyList()
             }
-            flog.i(TAG, "restoreServerHistory: ${history.size} messages")
+            _conversations.value = list
+            // Самая свежая беседа (ядро вернуло DESC) — активная при старте.
+            val first = list.firstOrNull() ?: return@launch
+            _activeConversationId.value = first.id
+            _activeConversationTitle.value = first.title
+            val history = runCatching { gatewayClient.loadMessages(first.id) }.getOrElse {
+                flog.e(TAG, "loadMessages failed: ${it.message}", it); emptyList()
+            }
+            flog.i(TAG, "restoreServerHistory: conv=${first.id} ${history.size} messages")
             if (history.isEmpty()) return@launch
             val restored = history.map {
                 Message(role = MessageRole.fromApiString(it.role), content = it.text)
@@ -234,32 +300,6 @@ class ConversationViewModel @Inject constructor(
             // as a second bubble once it finalized. Skipping restore in that rare case
             // is safe — the transcript reloads on the next launch.
             _messages.update { live -> if (live.isEmpty()) restored else live }
-        }
-    }
-
-    /**
-     * Switch the chat to another agent (picker). Rebinds the gateway session,
-     * clears the current transcript and loads the chosen agent's history. Chatting
-     * then targets that agent. Default agent is "main".
-     */
-    fun switchAgent(agentId: String) {
-        if (agentId == _activeAgent.value) return
-        _activeAgent.value = agentId
-        gatewayClient.switchAgent(agentId)
-        // Reset chat view for the new agent, then load its history.
-        _messages.value = emptyList()
-        currentRunId = null
-        viewModelScope.launch {
-            connectionState.first { it == GatewayConnectionState.CONNECTED }
-            val history = runCatching { gatewayClient.fetchHistory() }.getOrElse {
-                flog.e(TAG, "switchAgent fetchHistory failed: ${it.message}", it); emptyList()
-            }
-            flog.i(TAG, "switchAgent($agentId): ${history.size} messages")
-            // Only apply if the user hasn't switched again meanwhile.
-            if (_activeAgent.value != agentId) return@launch
-            _messages.value = history.map {
-                Message(role = MessageRole.fromApiString(it.role), content = it.text)
-            }
         }
     }
 
@@ -422,9 +462,14 @@ class ConversationViewModel @Inject constructor(
                 Message(id = runId, role = MessageRole.ASSISTANT, content = "", isStreaming = true)
         }
         _isProcessing.value = true
+        // Адресуем в активную беседу (null = ядро возьмёт активную). Флаг нового чата
+        // потребляем один раз — второе сообщение того же чата уже не создаёт диалог.
+        val convId = _activeConversationId.value
+        val isNew = pendingNewConversation
+        pendingNewConversation = false
         viewModelScope.launch {
             try {
-                gatewayClient.sendMessage(text, runId)
+                gatewayClient.sendMessage(text, runId, conversationId = convId, newConversation = isNew)
                 armReplyWatchdog()
             } catch (e: Exception) {
                 Log.e(TAG, "sendMessage failed: ${e.message}")
@@ -470,7 +515,10 @@ class ConversationViewModel @Inject constructor(
                 // Mark BEFORE sending: the reply's first delta can arrive before
                 // sendMessage() returns, and the delta handler reads this flag.
                 lastInputWasVoice = true
-                gatewayClient.sendMessage(transcript)
+                val convId = _activeConversationId.value
+                val isNew = pendingNewConversation
+                pendingNewConversation = false
+                gatewayClient.sendMessage(transcript, conversationId = convId, newConversation = isNew)
                 armReplyWatchdog()
             } catch (e: CancellationException) {
                 removePendingVoice()

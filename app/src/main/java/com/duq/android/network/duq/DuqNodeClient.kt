@@ -147,8 +147,9 @@ class DuqNodeClient @Inject constructor(
         val messageId = frame["message_id"] as? String ?: return
         val role = frame["role"] as? String ?: "assistant"
         val content = frame["content"] as? String ?: return
-        logger.d(TAG, "chat.message id=${messageId.take(8)} role=$role len=${content.length}")
-        chatClient.onIncomingMessage(messageId, role, content)
+        val conversationId = frame["conversation_id"] as? String
+        logger.d(TAG, "chat.message id=${messageId.take(8)} role=$role conv=${conversationId?.take(8)} len=${content.length}")
+        chatClient.onIncomingMessage(messageId, role, content, conversationId)
     }
 
     private fun handleCommand(frame: Map<String, Any?>) {

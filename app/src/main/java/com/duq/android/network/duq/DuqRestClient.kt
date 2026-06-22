@@ -52,9 +52,22 @@ class DuqRestClient @Inject constructor(
             header("Authorization", "Bearer ${AppConfig.SERVER_TOKEN}")
         else this
 
-    /** Ставит сообщение в очередь ядра. Возвращает task_id для последующего поллинга. */
-    suspend fun sendMessage(text: String): String = withContext(Dispatchers.IO) {
-        val body = gson.toJson(MessageRequest(text)).toRequestBody(JSON)
+    /**
+     * Ставит сообщение в очередь ядра. Возвращает task_id для последующего поллинга.
+     * [conversationId] — отправка в конкретную беседу (null = активная);
+     * [newConversation] — начать новый диалог (true только для первого сообщения нового чата).
+     */
+    suspend fun sendMessage(
+        text: String,
+        conversationId: String? = null,
+        newConversation: Boolean = false,
+    ): String = withContext(Dispatchers.IO) {
+        val req0 = MessageRequest(
+            message = text,
+            conversationId = conversationId,
+            newConversation = if (newConversation) true else null,
+        )
+        val body = gson.toJson(req0).toRequestBody(JSON)
         val req = Request.Builder().url(url("message")).withServerAuth().post(body).build()
         httpClient.newCall(req).execute().use { resp ->
             val raw = resp.body?.string().orEmpty()

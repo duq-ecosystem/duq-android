@@ -15,9 +15,18 @@ import com.google.gson.annotations.SerializedName
  * Все запросы несут edge-токен X-Auth-Token (см. network/ServerAuth.withServerAuth()).
  */
 
-/** Тело POST /duq/api/message. */
+/**
+ * Тело POST /duq/api/message.
+ *
+ * [conversationId] — адресная отправка в КОНКРЕТНУЮ беседу (переключатель диалогов):
+ * история и сохранение идут в неё, а не в активную. null → активная беседа (как было).
+ * [newConversation] — начать новый диалог (деактивирует текущий активный). Оба поля
+ * Gson опускает при null, так что прежний контракт ({message}) не меняется.
+ */
 data class MessageRequest(
-    val message: String
+    val message: String,
+    @SerializedName("conversation_id") val conversationId: String? = null,
+    @SerializedName("new_conversation") val newConversation: Boolean? = null
 )
 
 /** Ответ POST /duq/api/message — задача поставлена в очередь. */
@@ -47,10 +56,13 @@ data class TaskResponse(
     val channel: String? = null
 )
 
-/** Один диалог из GET /duq/api/conversations. */
+/** Один диалог из GET /duq/api/conversations (отсортированы по last_message_at DESC). */
 data class ConversationDto(
     val id: String,
-    val title: String? = null
+    val title: String? = null,
+    @SerializedName("last_message_at") val lastMessageAt: Long = 0,
+    @SerializedName("started_at") val startedAt: Long = 0,
+    @SerializedName("is_active") val isActive: Boolean = false
 )
 
 /** Одно сообщение из GET /duq/api/conversations/{id}/messages. */
@@ -67,7 +79,10 @@ data class HistoryMsg(
 data class DuqIncomingMessage(
     val messageId: String,
     val role: String,    // "user" | "assistant"
-    val content: String
+    val content: String,
+    // Беседа, к которой относится сообщение (для фильтрации по активному диалогу при
+    // переключении). null — старый формат пуша без conversation_id.
+    val conversationId: String? = null
 )
 
 // ── Чат-события / состояние соединения (перенесено из удалённого легаси-слоя) ──
@@ -98,6 +113,14 @@ data class OcAgentStep(
 data class OcHistoryMsg(
     val role: String,  // "user" | "assistant"
     val text: String
+)
+
+/** Беседа для переключателя диалогов, render-ready (id/заголовок/время/активность). */
+data class DuqConversation(
+    val id: String,
+    val title: String,
+    val lastMessageAt: Long,
+    val isActive: Boolean
 )
 
 /** Состояние WS-соединения чат-слоя. */

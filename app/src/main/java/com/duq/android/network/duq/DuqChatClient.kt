@@ -35,18 +35,18 @@ import javax.inject.Singleton
  *
  *  - [start], [connectionState]
  *  - [sendMessage] → enqueue + poll-await → эмит одного терминального [OcChatEvent]
+ *    (опц. адресуется в конкретную беседу conversationId / стартует новую newConversation)
  *  - [chatEvents], [agentSteps] (потоки)
- *  - [fetchHistory], [switchAgent], [transcribeAudio]
+ *  - [listConversations] / [loadMessages] — список диалогов и история выбранного
+ *  - [transcribeAudio]
  *
  * Контракт ядра — REST + поллинг задачи (нет стрима дельт). Поэтому ответ приходит
  * одним кадром: на send эмитим `OcChatEvent(state="final", fullText=ответ)`, что
  * корректно отрисовывает ConversationViewModel (вставит сообщение, снимет спиннер) и
  * показывает фоновое уведомление в DuqListenerService. Ошибка ядра → `state="error"`.
  *
- * Заглушки (у ядра нет аналога — Ф3a):
- *  - [agentSteps] — всегда пустой поток (нет tool-шагов в контракте ядра);
- *  - [switchAgent] — ноп (одно ядро/один агент);
- *  - [activeAgentId] — фиксировано "main".
+ * Ядро одноагентное: [activeAgentId] фиксировано "main"; tool-шаги ([agentSteps])
+ * приходят live через reasoning по /duq/ws (см. [onReasoning]).
  */
 @Singleton
 class DuqChatClient @Inject constructor(
@@ -78,8 +78,8 @@ class DuqChatClient @Inject constructor(
     val incomingMessages: SharedFlow<DuqIncomingMessage> = _incomingMessages.asSharedFlow()
 
     /** Вызывается WS-клиентом ([DuqNodeClient]) на каждый live-фрейм chat.message. */
-    fun onIncomingMessage(messageId: String, role: String, content: String) {
-        scope.launch { _incomingMessages.emit(DuqIncomingMessage(messageId, role, content)) }
+    fun onIncomingMessage(messageId: String, role: String, content: String, conversationId: String?) {
+        scope.launch { _incomingMessages.emit(DuqIncomingMessage(messageId, role, content, conversationId)) }
     }
 
     // Одно ядро/агент. Оставлено для совместимости API с прежним gateway.
@@ -108,11 +108,16 @@ class DuqChatClient @Inject constructor(
     // trace_id ядра, а не наш runId) вешаются на него (один тёрн за раз — однопользов.).
     @Volatile private var currentRunId: String? = null
 
-    suspend fun sendMessage(text: String, runId: String = UUID.randomUUID().toString()) {
+    suspend fun sendMessage(
+        text: String,
+        runId: String = UUID.randomUUID().toString(),
+        conversationId: String? = null,
+        newConversation: Boolean = false,
+    ) {
         currentRunId = runId
         scope.launch {
             try {
-                val taskId = rest.sendMessage(text)
+                val taskId = rest.sendMessage(text, conversationId, newConversation)
                 val answer = rest.awaitResponse(taskId)
                 _chatEvents.emit(
                     OcChatEvent(
@@ -166,26 +171,28 @@ class DuqChatClient @Inject constructor(
     }
 
     /**
-     * История из ядра: последний диалог из /conversations → его /messages. Если
-     * диалогов нет — пусто. Маппится в прежний [OcHistoryMsg] (role/text).
+     * Список диалогов пользователя (для переключателя бесед). Отсортирован ядром по
+     * last_message_at DESC — первый элемент = самый свежий/активный. Пусто при ошибке.
      */
-    suspend fun fetchHistory(limit: Int = 100): List<OcHistoryMsg> {
+    suspend fun listConversations(): List<DuqConversation> {
         val convs = runCatching { rest.conversations() }.getOrElse {
             logger.w(TAG, "conversations failed: ${it.message}"); return emptyList()
         }
-        val latest = convs.firstOrNull() ?: return emptyList()
-        val msgs = runCatching { rest.messages(latest.id) }.getOrElse {
-            logger.w(TAG, "messages failed: ${it.message}"); return emptyList()
+        return convs.map { DuqConversation(it.id, it.title ?: "Чат", it.lastMessageAt, it.isActive) }
+    }
+
+    /**
+     * Сообщения конкретной беседы по её id (для выбора/переключения диалога).
+     * Маппится в прежний [OcHistoryMsg] (role/text), отфильтровано до user/assistant.
+     */
+    suspend fun loadMessages(conversationId: String, limit: Int = 100): List<OcHistoryMsg> {
+        val msgs = runCatching { rest.messages(conversationId) }.getOrElse {
+            logger.w(TAG, "messages($conversationId) failed: ${it.message}"); return emptyList()
         }
         return msgs
             .filter { it.role == "user" || it.role == "assistant" }
             .map { OcHistoryMsg(it.role, it.content) }
             .takeLast(limit)
-    }
-
-    /** Ноп: ядро одноагентное (заглушка для совместимости с API gateway). */
-    fun switchAgent(agentId: String) {
-        logger.d(TAG, "switchAgent($agentId) — no-op (single-agent core)")
     }
 
     /** On-device whisper с fallback на серверный /stt (как в прежнем gateway). */
