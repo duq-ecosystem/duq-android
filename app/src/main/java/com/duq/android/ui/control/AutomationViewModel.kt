@@ -62,8 +62,14 @@ class AutomationViewModel @Inject constructor(
 
     fun deleteSkill(name: String) = mutate { rest.deleteSkill(name) }
 
+    fun editSkill(name: String, content: String, description: String?) =
+        mutate { rest.updateSkill(name, content = content.trim(), description = description?.trim()) }
+
     fun createTask(name: String, cron: String, skill: String) =
         mutate { rest.createCronTask(name.trim(), cron.trim(), skill, tz) }
+
+    fun editTask(taskId: String, name: String, cron: String, skill: String) =
+        mutate { rest.updateCronTask(taskId, cron = cron.trim(), skill = skill, name = name.trim()) }
 
     fun deleteTask(taskId: String) = mutate { rest.deleteCronTask(taskId) }
 

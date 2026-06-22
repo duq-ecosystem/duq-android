@@ -206,6 +206,17 @@ class DuqRestClient @Inject constructor(
             if (!resp.isSuccessful) throw DuqApiException("setCronEnabled ${resp.code}")
         }
     }
+
+    /** Правка крон-задачи: любое подмножество полей (Gson опускает null). */
+    suspend fun updateCronTask(
+        taskId: String, cron: String? = null, skill: String? = null, name: String? = null
+    ) = withContext(Dispatchers.IO) {
+        val body = gson.toJson(CronPatchBody(cron, skill, name)).toRequestBody(JSON)
+        val req = Request.Builder().url(url("scheduler/tasks/$taskId")).withServerAuth().patch(body).build()
+        httpClient.newCall(req).execute().use { resp ->
+            if (!resp.isSuccessful) throw DuqApiException("updateCron ${resp.code}: ${resp.body?.string()?.take(200)}")
+        }
+    }
 }
 
 /** Ошибка вызова REST-API ядра DUQ. */
@@ -236,3 +247,4 @@ data class CronTaskDto(
 data class CronTaskListDto(val tasks: List<CronTaskDto>?, val total: Int?)
 data class CronCreateBody(val name: String, val cron: String, val skill: String, val timezone: String)
 data class CronEnabledBody(val enabled: Boolean)
+data class CronPatchBody(val cron: String?, val skill: String?, val name: String?)

@@ -32,15 +32,15 @@ import com.duq.android.ui.theme.DuqColors
 fun SkillsScreen(onBack: () -> Unit, vm: AutomationViewModel = hiltViewModel()) {
     val st by vm.state.collectAsState()
     LaunchedEffect(Unit) { vm.load() }
-    var showCreate by remember { mutableStateOf(false) }
-    var expanded by remember { mutableStateOf<String?>(null) }
+    var creating by remember { mutableStateOf(false) }
+    var editing by remember { mutableStateOf<SkillDto?>(null) }
 
     Scaffold(
         containerColor = DuqColors.background,
         topBar = { AutoTopBar("Скиллы", onBack) },
         floatingActionButton = {
             ExtendedFloatingActionButton(
-                onClick = { showCreate = true },
+                onClick = { editing = null; creating = true },
                 containerColor = DuqColors.primary, contentColor = DuqColors.background,
                 icon = { Icon(Icons.Outlined.Add, null) }, text = { Text("Скилл") }
             )
@@ -57,22 +57,25 @@ fun SkillsScreen(onBack: () -> Unit, vm: AutomationViewModel = hiltViewModel()) 
                 ) {
                     st.error?.let { item { ErrorRow(it) } }
                     items(st.skills, key = { it.name }) { s ->
-                        SkillItem(s, expanded == s.name,
-                            onTap = { expanded = if (expanded == s.name) null else s.name },
-                            onDelete = { vm.deleteSkill(s.name) })
+                        SkillItem(s, onTap = { editing = s }, onDelete = { vm.deleteSkill(s.name) })
                     }
                 }
             }
         }
     }
-    if (showCreate) SkillCreateSheet(
-        onDismiss = { showCreate = false },
-        onCreate = { n, d, c -> vm.createSkill(n, c, d); showCreate = false }
+    if (creating || editing != null) SkillSheet(
+        initial = editing,
+        onDismiss = { creating = false; editing = null },
+        onSave = { name, desc, content ->
+            if (editing == null) vm.createSkill(name, content, desc)
+            else vm.editSkill(editing!!.name, content, desc)
+            creating = false; editing = null
+        }
     )
 }
 
 @Composable
-private fun SkillItem(s: SkillDto, expanded: Boolean, onTap: () -> Unit, onDelete: () -> Unit) {
+private fun SkillItem(s: SkillDto, onTap: () -> Unit, onDelete: () -> Unit) {
     ElevatedCard(
         Modifier.fillMaxWidth().clickable(onClick = onTap),
         colors = CardDefaults.elevatedCardColors(containerColor = DuqColors.surfaceVariant)
@@ -80,8 +83,8 @@ private fun SkillItem(s: SkillDto, expanded: Boolean, onTap: () -> Unit, onDelet
         ListItem(
             headlineContent = { Text(s.name, color = DuqColors.textPrimary, fontWeight = FontWeight.Medium) },
             supportingContent = {
-                Text(s.description?.takeIf { it.isNotBlank() } ?: "—",
-                    color = DuqColors.textSecondary, fontSize = 13.sp)
+                Text(s.description?.takeIf { it.isNotBlank() } ?: s.content.take(80),
+                    color = DuqColors.textSecondary, fontSize = 13.sp, maxLines = 2)
             },
             trailingContent = {
                 IconButton(onClick = onDelete) {
@@ -90,36 +93,34 @@ private fun SkillItem(s: SkillDto, expanded: Boolean, onTap: () -> Unit, onDelet
             },
             colors = ListItemDefaults.colors(containerColor = DuqColors.surfaceVariant)
         )
-        if (expanded) Text(
-            s.content, color = DuqColors.textSecondary, fontSize = 13.sp,
-            modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 14.dp)
-        )
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun SkillCreateSheet(onDismiss: () -> Unit, onCreate: (String, String, String) -> Unit) {
+private fun SkillSheet(initial: SkillDto?, onDismiss: () -> Unit, onSave: (String, String, String) -> Unit) {
     val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    var name by remember { mutableStateOf("") }
-    var desc by remember { mutableStateOf("") }
-    var content by remember { mutableStateOf("") }
+    val editMode = initial != null
+    var name by remember { mutableStateOf(initial?.name ?: "") }
+    var desc by remember { mutableStateOf(initial?.description ?: "") }
+    var content by remember { mutableStateOf(initial?.content ?: "") }
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheet, containerColor = DuqColors.surfaceElevated) {
         Column(
             Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 28.dp)
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text("Новый скилл", color = DuqColors.textPrimary, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
-            AutoField(name, { name = it }, "Имя (kebab-case)")
+            Text(if (editMode) "Скилл: ${initial!!.name}" else "Новый скилл",
+                color = DuqColors.textPrimary, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+            if (!editMode) AutoField(name, { name = it }, "Имя (kebab-case)")
             AutoField(desc, { desc = it }, "Описание (одна строка)")
             AutoField(content, { content = it }, "md-промпт: что сделать", minLines = 5)
             Button(
-                onClick = { if (name.isNotBlank() && content.isNotBlank()) onCreate(name, desc, content) },
+                onClick = { if (name.isNotBlank() && content.isNotBlank()) onSave(name, desc, content) },
                 enabled = name.isNotBlank() && content.isNotBlank(),
                 colors = ButtonDefaults.buttonColors(containerColor = DuqColors.primary, contentColor = DuqColors.background),
                 modifier = Modifier.fillMaxWidth()
-            ) { Text("Создать скилл") }
+            ) { Text(if (editMode) "Сохранить" else "Создать скилл") }
         }
     }
 }
@@ -131,14 +132,15 @@ private fun SkillCreateSheet(onDismiss: () -> Unit, onCreate: (String, String, S
 fun ScheduleScreen(onBack: () -> Unit, vm: AutomationViewModel = hiltViewModel()) {
     val st by vm.state.collectAsState()
     LaunchedEffect(Unit) { vm.load() }
-    var showCreate by remember { mutableStateOf(false) }
+    var creating by remember { mutableStateOf(false) }
+    var editing by remember { mutableStateOf<CronTaskDto?>(null) }
 
     Scaffold(
         containerColor = DuqColors.background,
         topBar = { AutoTopBar("Расписание", onBack) },
         floatingActionButton = {
             ExtendedFloatingActionButton(
-                onClick = { showCreate = true },
+                onClick = { editing = null; creating = true },
                 containerColor = DuqColors.primary, contentColor = DuqColors.background,
                 icon = { Icon(Icons.Outlined.Add, null) }, text = { Text("Задача") }
             )
@@ -155,23 +157,29 @@ fun ScheduleScreen(onBack: () -> Unit, vm: AutomationViewModel = hiltViewModel()
                 ) {
                     st.error?.let { item { ErrorRow(it) } }
                     items(st.tasks, key = { it.task_id }) { t ->
-                        CronItem(t, onToggle = { vm.toggleTask(t) }, onDelete = { vm.deleteTask(t.task_id) })
+                        CronItem(t, onTap = { editing = t },
+                            onToggle = { vm.toggleTask(t) }, onDelete = { vm.deleteTask(t.task_id) })
                     }
                 }
             }
         }
     }
-    if (showCreate) CronCreateSheet(
+    if (creating || editing != null) CronSheet(
+        initial = editing,
         skills = st.skills.map { it.name },
-        onDismiss = { showCreate = false },
-        onCreate = { n, cron, skill -> vm.createTask(n, cron, skill); showCreate = false }
+        onDismiss = { creating = false; editing = null },
+        onSave = { n, cron, skill ->
+            if (editing == null) vm.createTask(n, cron, skill)
+            else vm.editTask(editing!!.task_id, n, cron, skill)
+            creating = false; editing = null
+        }
     )
 }
 
 @Composable
-private fun CronItem(t: CronTaskDto, onToggle: () -> Unit, onDelete: () -> Unit) {
+private fun CronItem(t: CronTaskDto, onTap: () -> Unit, onToggle: () -> Unit, onDelete: () -> Unit) {
     ElevatedCard(
-        Modifier.fillMaxWidth(),
+        Modifier.fillMaxWidth().clickable(onClick = onTap),
         colors = CardDefaults.elevatedCardColors(containerColor = DuqColors.surfaceVariant)
     ) {
         ListItem(
@@ -199,20 +207,23 @@ private fun CronItem(t: CronTaskDto, onToggle: () -> Unit, onDelete: () -> Unit)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun CronCreateSheet(
-    skills: List<String>, onDismiss: () -> Unit, onCreate: (String, String, String) -> Unit
+private fun CronSheet(
+    initial: CronTaskDto?, skills: List<String>,
+    onDismiss: () -> Unit, onSave: (String, String, String) -> Unit
 ) {
     val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    var name by remember { mutableStateOf("") }
-    var cron by remember { mutableStateOf("0 9 * * *") }
-    var skill by remember { mutableStateOf(skills.firstOrNull() ?: "") }
+    val editMode = initial != null
+    var name by remember { mutableStateOf(initial?.name ?: "") }
+    var cron by remember { mutableStateOf(initial?.cron ?: "0 9 * * *") }
+    var skill by remember { mutableStateOf(initial?.skill ?: skills.firstOrNull() ?: "") }
     var menu by remember { mutableStateOf(false) }
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheet, containerColor = DuqColors.surfaceElevated) {
         Column(
             Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 28.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text("Новая задача", color = DuqColors.textPrimary, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+            Text(if (editMode) "Редактировать задачу" else "Новая задача",
+                color = DuqColors.textPrimary, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
             AutoField(name, { name = it }, "Название задачи")
             AutoField(cron, { cron = it }, "cron: мин час день месяц день-недели")
             Text(cronHuman(cron), color = DuqColors.textDim, fontSize = 12.sp)
@@ -233,11 +244,11 @@ private fun CronCreateSheet(
                 }
             }
             Button(
-                onClick = { if (name.isNotBlank() && cron.isNotBlank() && skill.isNotBlank()) onCreate(name, cron, skill) },
+                onClick = { if (name.isNotBlank() && cron.isNotBlank() && skill.isNotBlank()) onSave(name, cron, skill) },
                 enabled = name.isNotBlank() && cron.isNotBlank() && skill.isNotBlank(),
                 colors = ButtonDefaults.buttonColors(containerColor = DuqColors.primary, contentColor = DuqColors.background),
                 modifier = Modifier.fillMaxWidth()
-            ) { Text("Создать задачу") }
+            ) { Text(if (editMode) "Сохранить" else "Создать задачу") }
         }
     }
 }
