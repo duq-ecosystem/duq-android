@@ -44,6 +44,14 @@ class DuqRestClient @Inject constructor(
 
     private fun url(path: String) = AppConfig.DUQ_API_BASE_URL + path
 
+    // /conversations и /messages на ядре защищены HTTPBearer (Depends(keycloak_sub)),
+    // в отличие от /message и /task. Они принимают тот же edge-токен, но в заголовке
+    // Authorization: Bearer (не X-Auth-Token). Без него — 401 и пустая история.
+    private fun Request.Builder.withBearer(): Request.Builder =
+        if (AppConfig.SERVER_TOKEN.isNotEmpty())
+            header("Authorization", "Bearer ${AppConfig.SERVER_TOKEN}")
+        else this
+
     /** Ставит сообщение в очередь ядра. Возвращает task_id для последующего поллинга. */
     suspend fun sendMessage(text: String): String = withContext(Dispatchers.IO) {
         val body = gson.toJson(MessageRequest(text)).toRequestBody(JSON)
@@ -92,7 +100,7 @@ class DuqRestClient @Inject constructor(
 
     /** Список диалогов пользователя. */
     suspend fun conversations(): List<ConversationDto> = withContext(Dispatchers.IO) {
-        val req = Request.Builder().url(url("conversations")).withServerAuth().get().build()
+        val req = Request.Builder().url(url("conversations")).withServerAuth().withBearer().get().build()
         httpClient.newCall(req).execute().use { resp ->
             val raw = resp.body?.string().orEmpty()
             if (!resp.isSuccessful) throw DuqApiException("conversations ${resp.code}")
@@ -103,7 +111,7 @@ class DuqRestClient @Inject constructor(
 
     /** Сообщения одного диалога. */
     suspend fun messages(convId: String): List<HistoryMsg> = withContext(Dispatchers.IO) {
-        val req = Request.Builder().url(url("conversations/$convId/messages")).withServerAuth().get().build()
+        val req = Request.Builder().url(url("conversations/$convId/messages")).withServerAuth().withBearer().get().build()
         httpClient.newCall(req).execute().use { resp ->
             val raw = resp.body?.string().orEmpty()
             if (!resp.isSuccessful) throw DuqApiException("messages ${resp.code}")
