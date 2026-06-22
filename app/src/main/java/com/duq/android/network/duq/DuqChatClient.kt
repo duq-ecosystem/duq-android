@@ -67,8 +67,8 @@ class DuqChatClient @Inject constructor(
     private val _chatEvents = MutableSharedFlow<OcChatEvent>(extraBufferCapacity = 128)
     val chatEvents: SharedFlow<OcChatEvent> = _chatEvents.asSharedFlow()
 
-    // Tool-шаги ядром не передаются — пустой поток-заглушка (ничего не эмитит).
-    private val _agentSteps = MutableSharedFlow<OcAgentStep>(extraBufferCapacity = 1)
+    // Tool-шаги агента приходят live из ядра по reasoning-стриму (см. [onReasoning]).
+    private val _agentSteps = MutableSharedFlow<OcAgentStep>(extraBufferCapacity = 8)
     val agentSteps: SharedFlow<OcAgentStep> = _agentSteps.asSharedFlow()
 
     // Live-синк: сообщения беседы, пришедшие пушем по /duq/ws (ответ бота, проактив,
@@ -120,24 +120,12 @@ class DuqChatClient @Inject constructor(
                 val taskId = rest.sendMessage(text, conversationId, newConversation)
                 val answer = rest.awaitResponse(taskId)
                 _chatEvents.emit(
-                    OcChatEvent(
-                        runId = runId,
-                        sessionKey = activeAgentId,
-                        seq = 0,
-                        state = "final",
-                        fullText = answer
-                    )
+                    OcChatEvent(runId = runId, state = "final", fullText = answer)
                 )
             } catch (e: Exception) {
                 logger.e(TAG, "sendMessage failed: ${e.message}")
                 _chatEvents.emit(
-                    OcChatEvent(
-                        runId = runId,
-                        sessionKey = activeAgentId,
-                        seq = 0,
-                        state = "error",
-                        errorMessage = e.message ?: "Send failed"
-                    )
+                    OcChatEvent(runId = runId, state = "error", errorMessage = e.message ?: "Send failed")
                 )
             } finally {
                 if (currentRunId == runId) currentRunId = null

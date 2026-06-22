@@ -6,13 +6,15 @@ import com.google.gson.annotations.SerializedName
  * DTO нового контракта ядра DUQ (собственное Python-ядро duq-core за nginx,
  * домен on-za-menya.online, префикс /duq). Заменяет прежний протокол чата.
  *
- * Контракт (Ф3a — только чат):
- *  - POST /duq/api/message            {message}            → {task_id,status}
+ * Контракт:
+ *  - POST /duq/api/message     {message, conversation_id?, new_conversation?} → {task_id,status}
  *  - GET  /duq/api/task/{task_id}                          → {status,result,error}
- *  - GET  /duq/api/conversations                           → [ConversationDto]
+ *  - GET  /duq/api/conversations                           → [ConversationDto] (title=topic-саммари)
  *  - GET  /duq/api/conversations/{id}/messages             → [HistoryMsg]
+ *  - WS   /duq/ws                          → chat.message (live-синк) + REASONING_* (tool-шаги) + phone.command
  *
- * Все запросы несут edge-токен X-Auth-Token (см. network/ServerAuth.withServerAuth()).
+ * Запросы несут edge-токен X-Auth-Token (ServerAuth.withServerAuth());
+ * /conversations|/messages дополнительно — Authorization: Bearer (DuqRestClient.withBearer).
  */
 
 /**
@@ -90,16 +92,14 @@ data class DuqIncomingMessage(
 /** Терминальное (или стрим-) событие ответа, которое рендерит ConversationViewModel. */
 data class OcChatEvent(
     val runId: String,
-    val sessionKey: String,
-    val seq: Int,
     val state: String,          // "delta" | "final" | "error" | "aborted"
     val deltaText: String? = null,
     val fullText: String? = null,
-    val errorMessage: String? = null,
-    val stopReason: String? = null
+    val errorMessage: String? = null
 )
 
-/** Шаг агента (tool/command) внутри ответа — пока ядром не передаётся (заглушка). */
+/** Шаг агента (tool/command) внутри ответа — приходит live из ядра по reasoning-стриму
+ *  (REASONING_ACTION /duq/ws → DuqChatClient.onReasoning), рендерится в пузыре. */
 data class OcAgentStep(
     val runId: String,
     val itemId: String,
@@ -130,4 +130,4 @@ data class DuqConversation(
 )
 
 /** Состояние WS-соединения чат-слоя. */
-enum class GatewayConnectionState { DISCONNECTED, CONNECTING, CONNECTED, PAIRING, ERROR }
+enum class GatewayConnectionState { DISCONNECTED, CONNECTING, CONNECTED }
