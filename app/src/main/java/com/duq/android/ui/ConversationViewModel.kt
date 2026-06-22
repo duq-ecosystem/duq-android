@@ -241,7 +241,7 @@ class ConversationViewModel @Inject constructor(
         if (id == _activeConversationId.value) return
         _activeConversationId.value = id
         pendingNewConversation = false
-        _activeConversationTitle.value = _conversations.value.firstOrNull { it.id == id }?.title ?: "Чат"
+        _activeConversationTitle.value = _conversations.value.firstOrNull { it.id == id }?.dateLabel ?: "Чат"
         _messages.value = emptyList()
         currentRunId = null
         disarmReplyWatchdog(); _isProcessing.value = false
@@ -284,7 +284,7 @@ class ConversationViewModel @Inject constructor(
             // Самая свежая беседа (ядро вернуло DESC) — активная при старте.
             val first = list.firstOrNull() ?: return@launch
             _activeConversationId.value = first.id
-            _activeConversationTitle.value = first.title
+            _activeConversationTitle.value = first.dateLabel
             val history = runCatching { gatewayClient.loadMessages(first.id) }.getOrElse {
                 flog.e(TAG, "loadMessages failed: ${it.message}", it); emptyList()
             }

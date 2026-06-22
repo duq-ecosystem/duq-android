@@ -115,10 +115,16 @@ data class OcHistoryMsg(
     val text: String
 )
 
-/** Беседа для переключателя диалогов, render-ready (id/заголовок/время/активность). */
+/**
+ * Беседа для переключателя диалогов, render-ready.
+ *  - [dateLabel] — человеческая русская дата (Сегодня/Вчера/«20 июня») для КНОПКИ-шапки.
+ *  - [summary]   — краткое саммари темы (как в ChatGPT/Claude) для списка истории;
+ *                  null, если беседа ещё не оттайтлена (тогда в списке показываем дату).
+ */
 data class DuqConversation(
     val id: String,
-    val title: String,
+    val summary: String?,
+    val dateLabel: String,
     val lastMessageAt: Long,
     val isActive: Boolean
 )

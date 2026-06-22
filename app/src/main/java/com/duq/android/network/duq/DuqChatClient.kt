@@ -178,16 +178,31 @@ class DuqChatClient @Inject constructor(
         val convs = runCatching { rest.conversations() }.getOrElse {
             logger.w(TAG, "conversations failed: ${it.message}"); return emptyList()
         }
-        // Заголовок — человеческая русская дата по дню начала беседы: сегодня → «Сегодня»,
-        // вчера → «Вчера», дальше — «20 июня» / «20 июня 2025». Серверный title (англ.
-        // "June 22, 2026") как fallback, если started_at не пришёл.
+        // dateLabel — человеческая русская дата (Сегодня/Вчера/«20 июня») для шапки.
+        // summary — серверный topic-title (генерит ядро лёгкой моделью), null пока беседа
+        // не оттайтлена (тогда серверный title ещё англ. дата-дефолт "June 22, 2026").
         return convs.map {
-            DuqConversation(it.id, conversationTitle(it.startedAt, it.title), it.lastMessageAt, it.isActive)
+            DuqConversation(
+                id = it.id,
+                summary = topicSummaryOrNull(it.title),
+                dateLabel = dateLabel(it.startedAt, it.title),
+                lastMessageAt = it.lastMessageAt,
+                isActive = it.isActive,
+            )
         }
     }
 
+    /** Серверный title как саммари темы, либо null если это ещё авто-дата-дефолт/пусто. */
+    private fun topicSummaryOrNull(serverTitle: String?): String? {
+        val t = serverTitle?.trim().orEmpty()
+        if (t.isEmpty()) return null
+        // Авто-дефолт ядра — английская дата "June 22, 2026" → ещё не оттайтлено темой.
+        if (Regex("^[A-Z][a-z]+ \\d{1,2}, \\d{4}$").matches(t)) return null
+        return t
+    }
+
     /** Русский относительный заголовок беседы по её started_at (epoch seconds). */
-    private fun conversationTitle(startedAtEpoch: Long, fallback: String?): String {
+    private fun dateLabel(startedAtEpoch: Long, fallback: String?): String {
         if (startedAtEpoch <= 0L) return fallback?.takeIf { it.isNotBlank() } ?: "Чат"
         val zone = java.time.ZoneId.systemDefault()
         val date = java.time.Instant.ofEpochSecond(startedAtEpoch).atZone(zone).toLocalDate()
