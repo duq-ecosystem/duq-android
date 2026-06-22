@@ -60,12 +60,13 @@ class AutomationViewModel @Inject constructor(
     fun createSkill(name: String, content: String, description: String?) =
         mutate { rest.createSkill(name.trim(), content.trim(), description?.trim()?.ifBlank { null }) }
 
-    fun toggleSkill(s: SkillDto) = mutate { rest.updateSkill(s.name, enabled = !s.enabled) }
-
     fun deleteSkill(name: String) = mutate { rest.deleteSkill(name) }
 
     fun createTask(name: String, cron: String, skill: String) =
         mutate { rest.createCronTask(name.trim(), cron.trim(), skill, tz) }
 
     fun deleteTask(taskId: String) = mutate { rest.deleteCronTask(taskId) }
+
+    /** Вкл/выкл крон-задачи (pause/resume). Включаемый именно КРОН, не скилл. */
+    fun toggleTask(t: CronTaskDto) = mutate { rest.setCronEnabled(t.task_id, !t.enabled) }
 }

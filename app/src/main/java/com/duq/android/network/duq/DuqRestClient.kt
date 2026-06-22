@@ -198,6 +198,14 @@ class DuqRestClient @Inject constructor(
             if (!resp.isSuccessful && resp.code != 404) throw DuqApiException("deleteCron ${resp.code}")
         }
     }
+
+    suspend fun setCronEnabled(taskId: String, enabled: Boolean) = withContext(Dispatchers.IO) {
+        val body = gson.toJson(CronEnabledBody(enabled)).toRequestBody(JSON)
+        val req = Request.Builder().url(url("scheduler/tasks/$taskId")).withServerAuth().patch(body).build()
+        httpClient.newCall(req).execute().use { resp ->
+            if (!resp.isSuccessful) throw DuqApiException("setCronEnabled ${resp.code}")
+        }
+    }
 }
 
 /** Ошибка вызова REST-API ядра DUQ. */
@@ -222,7 +230,9 @@ data class CronTaskDto(
     val cron: String?,
     val timezone: String?,
     val next_run: String?,
-    val skill: String?
+    val skill: String?,
+    val enabled: Boolean = true
 )
 data class CronTaskListDto(val tasks: List<CronTaskDto>?, val total: Int?)
 data class CronCreateBody(val name: String, val cron: String, val skill: String, val timezone: String)
+data class CronEnabledBody(val enabled: Boolean)
