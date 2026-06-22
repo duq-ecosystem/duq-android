@@ -149,7 +149,7 @@ class ChatAudioPlaybackManager @Inject constructor(
                     state = PlaybackState.LOADING
                 )
 
-                // Check cache only (no remote download in OpenClaw flow)
+                // Check cache only (no remote download)
                 val cachedFile = getCachedAudioFile(messageId)
                 if (cachedFile.exists()) {
                     Log.d(TAG, "Using cached audio for message $messageId")

@@ -2,7 +2,6 @@ package com.duq.android.network.duq
 
 import com.duq.android.config.AppConfig
 import com.duq.android.logging.Logger
-import com.duq.android.network.openclaw.GatewayConnectionState
 import com.duq.android.network.withServerAuth
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
@@ -28,7 +27,7 @@ import kotlin.math.pow
 
 /**
  * DUQ **node** host — the "bot → phone" direction over the core's bidirectional
- * /duq/ws socket (replaces the OpenClaw `node.invoke` mechanism).
+ * /duq/ws socket (replaces the legacy `node.invoke` mechanism).
  *
  * The core streams native commands as {type:"phone.command", request_id, command,
  * params}; we run them via [PhoneCommandExecutor] and answer with {type:"phone.result",

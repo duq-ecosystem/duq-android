@@ -33,8 +33,8 @@ import javax.inject.Singleton
  * Transport-agnostic executor of native phone-control commands (bot → phone).
  *
  * The command set (location / notify / voice / camera / screen) is the phone's
- * capability surface; it used to live inside OpenClawNodeClient, tied to the
- * OpenClaw `node.invoke` protocol. With DUQ on its own core the transport is the
+ * capability surface; it used to live in the legacy node client, tied to the old
+ * node.invoke protocol. With DUQ on its own core the transport is the
  * bidirectional /duq/ws ([DuqNodeClient]), so the *how-to-do-it* is factored out
  * here and the WS client only deals with framing.
  */

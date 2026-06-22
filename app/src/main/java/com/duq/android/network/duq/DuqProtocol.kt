@@ -4,7 +4,7 @@ import com.google.gson.annotations.SerializedName
 
 /**
  * DTO нового контракта ядра DUQ (собственное Python-ядро duq-core за nginx,
- * домен on-za-menya.online, префикс /duq). Заменяет OpenClaw-протокол для ЧАТА.
+ * домен on-za-menya.online, префикс /duq). Заменяет прежний протокол чата.
  *
  * Контракт (Ф3a — только чат):
  *  - POST /duq/api/message            {message}            → {task_id,status}
@@ -69,3 +69,36 @@ data class DuqIncomingMessage(
     val role: String,    // "user" | "assistant"
     val content: String
 )
+
+// ── Чат-события / состояние соединения (перенесено из удалённого легаси-слоя) ──
+
+/** Терминальное (или стрим-) событие ответа, которое рендерит ConversationViewModel. */
+data class OcChatEvent(
+    val runId: String,
+    val sessionKey: String,
+    val seq: Int,
+    val state: String,          // "delta" | "final" | "error" | "aborted"
+    val deltaText: String? = null,
+    val fullText: String? = null,
+    val errorMessage: String? = null,
+    val stopReason: String? = null
+)
+
+/** Шаг агента (tool/command) внутри ответа — пока ядром не передаётся (заглушка). */
+data class OcAgentStep(
+    val runId: String,
+    val itemId: String,
+    val kind: String,    // "tool" | "command"
+    val title: String,
+    val status: String,  // "running" | "completed" | "failed"
+    val phase: String    // "update" | "end"
+)
+
+/** Одно прошлое сообщение из истории беседы (role/text), render-ready. */
+data class OcHistoryMsg(
+    val role: String,  // "user" | "assistant"
+    val text: String
+)
+
+/** Состояние WS-соединения чат-слоя. */
+enum class GatewayConnectionState { DISCONNECTED, CONNECTING, CONNECTED, PAIRING, ERROR }

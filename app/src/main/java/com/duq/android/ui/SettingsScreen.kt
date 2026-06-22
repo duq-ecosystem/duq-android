@@ -18,8 +18,6 @@ import kotlin.math.roundToInt
 fun SettingsScreen(onBack: () -> Unit) {
     val context = LocalContext.current
     val repo = remember { SettingsRepository(context) }
-    val isPaired by repo.isPaired.collectAsState(initial = false)
-    var wakeWordSensitivity by remember { mutableFloatStateOf(repo.getWakeWordSensitivitySync()) }
     var silenceTimeout by remember { mutableFloatStateOf(repo.getSilenceTimeoutMsSync().toFloat()) }
 
     Scaffold(
@@ -34,26 +32,7 @@ fun SettingsScreen(onBack: () -> Unit) {
             modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp).verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Gateway", style = MaterialTheme.typography.titleMedium)
-                    Text(if (isPaired) "Paired with DUQ" else "Not paired",
-                        color = if (isPaired) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error)
-                    if (isPaired) {
-                        OutlinedButton(onClick = { repo.clearPairing() }, modifier = Modifier.fillMaxWidth()) {
-                            Text("Unpair")
-                        }
-                    }
-                }
-            }
-
-            HorizontalDivider()
             Text("Voice", style = MaterialTheme.typography.titleMedium)
-
-            Text("Wake Word Sensitivity: ${(wakeWordSensitivity * 100).roundToInt()}%")
-            Slider(value = wakeWordSensitivity, onValueChange = { wakeWordSensitivity = it },
-                onValueChangeFinished = { repo.saveWakeWordSensitivity(wakeWordSensitivity) },
-                valueRange = 0.5f..1.0f, modifier = Modifier.fillMaxWidth())
 
             Text("Silence Timeout: ${(silenceTimeout / 1000).roundToInt()}s")
             Slider(value = silenceTimeout, onValueChange = { silenceTimeout = it },

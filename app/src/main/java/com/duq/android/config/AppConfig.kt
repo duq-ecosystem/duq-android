@@ -12,7 +12,7 @@ object AppConfig {
     // Used for contextual TTS: speak a reply only when the user spoke.
     const val TTS_URL = "$BASE_URL/tts"
     // Core-update handle (ручка): backend FastAPI that triggers the CONTROLLED
-    // openclaw core update via scripts/update-openclaw.sh (NOT the engine npm
+    // core update via scripts/update-core.sh (NOT the engine npm
     // self-update — that one breaks local memory). GET status, POST run. The
     // «Движок» screen reads status + the «Обновить ядро» button POSTs run.
     const val CORE_UPDATE_STATUS_URL = "$BASE_URL/core-update/status"

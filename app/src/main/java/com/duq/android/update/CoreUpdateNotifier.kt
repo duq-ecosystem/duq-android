@@ -6,7 +6,7 @@ import com.duq.android.network.CoreUpdateClient
 import com.duq.android.service.DuqNotificationManager
 
 /**
- * Фоновая проверка обновления ЯДРА openclaw: опрашивает бэкенд-ручку
+ * Фоновая проверка обновления ЯДРА DUQ: опрашивает бэкенд-ручку
  * `/core-update/status` и, если доступна новая версия, шлёт ЛОКАЛЬНЫЙ пуш
  * «Обновление ядра» с deep-link в раздел «Движок» (type="core_update").
  *

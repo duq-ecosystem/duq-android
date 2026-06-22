@@ -29,7 +29,7 @@ class UpdateWorker(context: Context, params: WorkerParameters) : CoroutineWorker
             val nm = applicationContext.getSystemService(NotificationManager::class.java)
             // Background: only detect + notify (no 33MB download on a timer/battery).
             AppUpdater(applicationContext, nm.areNotificationsEnabled()).checkAvailable()
-            // Заодно проверяем обновление ЯДРА openclaw → пуш с deep-link в «Движок».
+            // Заодно проверяем обновление ЯДРА DUQ → пуш с deep-link в «Движок».
             CoreUpdateNotifier.check(applicationContext)
             flog.i("AppUpdater", "UpdateWorker.doWork() finished")
             Result.success()

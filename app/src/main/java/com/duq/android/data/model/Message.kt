@@ -18,7 +18,7 @@ enum class MessageRole {
  * mail check). Rendered inline in the assistant bubble as a collapsible "tool
  * use" block, like Claude/ChatGPT — not as a transient line under the duck.
  *
- * Keyed by [callId] = the gateway's `toolCallId`, NOT the raw item id: openclaw
+ * Keyed by [callId] = the `toolCallId`, NOT the raw item id: the engine
  * emits up to two item events per call — a `kind:"tool"` one (the tool itself)
  * and, for exec/patch tools, a `kind:"command"`/`"patch"` one carrying the live
  * shell detail — both sharing one `toolCallId`. Grouping by callId collapses that

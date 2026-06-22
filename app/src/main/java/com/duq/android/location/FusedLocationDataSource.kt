@@ -27,7 +27,7 @@ class FusedLocationDataSource(private val context: Context) : LocationDataSource
     companion object {
         private const val TAG = "FusedLocation"
         private const val INTERVAL_MS = 24 * 60 * 60 * 1000L  // 24 hours
-        private const val SMALLEST_DISPLACEMENT_M = 25_000f   // 25 km — matches LocationReporter dedup
+        private const val SMALLEST_DISPLACEMENT_M = 25_000f   // 25 km — coarse location dedup
     }
 
     private val client = LocationServices.getFusedLocationProviderClient(context)

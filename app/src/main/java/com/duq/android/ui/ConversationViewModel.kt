@@ -12,9 +12,9 @@ import com.duq.android.data.model.VoicePhase
 import com.duq.android.error.DuqError
 import com.duq.android.network.duq.DuqChatClient
 import com.duq.android.network.duq.DuqIncomingMessage
-import com.duq.android.network.openclaw.GatewayConnectionState
-import com.duq.android.network.openclaw.OcAgentStep
-import com.duq.android.network.openclaw.OcChatEvent
+import com.duq.android.network.duq.GatewayConnectionState
+import com.duq.android.network.duq.OcAgentStep
+import com.duq.android.network.duq.OcChatEvent
 import com.duq.android.update.AppUpdater
 import com.duq.android.util.ReplyText
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -178,7 +178,7 @@ class ConversationViewModel @Inject constructor(
 
     /** An agent the user can switch the chat to (real gateway agent ids + a hint). */
     data class AgentOption(val id: String, val name: String, val desc: String, val emoji: String)
-    // Configured agents on the gateway (openclaw.json agents.list). "main" is the
+    // Configured agents on the gateway (core config). "main" is the
     // default operator chat; the others can be viewed / talked to via the picker.
     val availableAgents = listOf(
         AgentOption("main", "Main", "Главный ассистент", "🤖"),
@@ -199,7 +199,7 @@ class ConversationViewModel @Inject constructor(
      * Restore the chat from the server-side transcript (`chat.history`) once the
      * gateway is connected. The gateway is the single source of truth for history
      * (shared across all devices), so we don't keep a local copy — this is the
-     * openclaw-native way and fixes "chat resets every launch" at the root.
+     * server-as-source-of-truth way and fixes "chat resets every launch" at the root.
      */
     private fun restoreServerHistory() {
         viewModelScope.launch {
@@ -270,7 +270,7 @@ class ConversationViewModel @Inject constructor(
         // just after the chat `final` still upgrade the step's label/kind from the
         // `command` detail to the authoritative `tool` one.
         val finished = step.phase == "end" || step.status == "completed" || step.status == "failed"
-        // openclaw emits up to two items per call (tool + its command/patch detail)
+        // the engine emits up to two items per call (tool + its command/patch detail)
         // sharing one toolCallId — itemId is "tool:<callId>"/"command:<callId>". Key
         // by the callId so the pair collapses into one step (the engine's own model).
         // A tool step is a sign of life too (a cold memory recall can run for tens of

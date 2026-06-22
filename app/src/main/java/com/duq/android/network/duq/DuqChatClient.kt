@@ -3,10 +3,6 @@ package com.duq.android.network.duq
 import com.duq.android.audio.WhisperLocal
 import com.duq.android.config.AppConfig
 import com.duq.android.logging.Logger
-import com.duq.android.network.openclaw.GatewayConnectionState
-import com.duq.android.network.openclaw.OcAgentStep
-import com.duq.android.network.openclaw.OcChatEvent
-import com.duq.android.network.openclaw.OcHistoryMsg
 import com.duq.android.network.withServerAuth
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
@@ -34,7 +30,7 @@ import javax.inject.Singleton
 
 /**
  * Фасад чата поверх нового ядра DUQ ([DuqRestClient]). Держит ТОТ ЖЕ публичный API,
- * что бывший OpenClawGatewayClient ожидают потребители чата (ConversationViewModel,
+ * что ожидают потребители чата (ConversationViewModel,
  * DuqListenerService) — чтобы переключение прошло без правок их логики:
  *
  *  - [start], [connectionState]
