@@ -69,7 +69,6 @@ fun DuqApp() {
 
     val entryPoint = remember { EntryPointAccessors.fromApplication(context, DuqAppEntryPoint::class.java) }
     val audioPlaybackManager = remember { entryPoint.chatAudioPlaybackManager() }
-    val settings = remember { entryPoint.settingsRepository() }
 
     // The playback manager is an app-scoped @Singleton; its ExoPlayer lives for the
     // process. Do NOT release() it on composable disposal — release() flips an
@@ -77,9 +76,12 @@ fun DuqApp() {
     // DuqApp would leave audio permanently dead. The process teardown frees ExoPlayer.
     LaunchedEffect(Unit) { audioPlaybackManager.initialize() }
 
-    // Use sync value as initial to avoid null flash that routes to PairingScreen (camera open bug)
-    val isPaired by settings.isPaired.collectAsState(initial = settings.isPairedSync())
-    val startDestination = if (isPaired) Screen.Shell.route else Screen.Pairing.route
+    // Ф3c: ядро DUQ авторизуется build-time edge-токеном (BuildConfig.SERVER_TOKEN) —
+    // устройство НЕ пейрится (Ed25519/bootstrap — легаси OpenClaw). Поэтому всегда
+    // стартуем с чата, без экрана пейринга (он гейтил свежую установку в никуда:
+    // у ядра нет pairing-эндпоинта). PairingScreen оставлен как маршрут до полной
+    // чистки legacy network/openclaw в Ф3c.
+    val startDestination = Screen.Shell.route
 
     NavHost(navController = navController, startDestination = startDestination) {
         composable(Screen.Pairing.route) {
