@@ -58,3 +58,14 @@ data class HistoryMsg(
     val role: String,    // "user" | "assistant"
     val content: String
 )
+
+/**
+ * Live-сообщение беседы, пришедшее пушем по /duq/ws (полный синк API↔мобилка):
+ * ответ бота, проактив/morning-brief, или сообщение, отправленное через REST из
+ * другого источника. messageId — серверный id (для идемпотентности/дедупа).
+ */
+data class DuqIncomingMessage(
+    val messageId: String,
+    val role: String,    // "user" | "assistant"
+    val content: String
+)

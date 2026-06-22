@@ -75,6 +75,17 @@ class DuqChatClient @Inject constructor(
     private val _agentSteps = MutableSharedFlow<OcAgentStep>(extraBufferCapacity = 1)
     val agentSteps: SharedFlow<OcAgentStep> = _agentSteps.asSharedFlow()
 
+    // Live-синк: сообщения беседы, пришедшие пушем по /duq/ws (ответ бота, проактив,
+    // REST из другого источника). Заполняется из [DuqNodeClient]; ViewModel рендерит
+    // с дедупом. См. [onIncomingMessage].
+    private val _incomingMessages = MutableSharedFlow<DuqIncomingMessage>(extraBufferCapacity = 64)
+    val incomingMessages: SharedFlow<DuqIncomingMessage> = _incomingMessages.asSharedFlow()
+
+    /** Вызывается WS-клиентом ([DuqNodeClient]) на каждый live-фрейм chat.message. */
+    fun onIncomingMessage(messageId: String, role: String, content: String) {
+        scope.launch { _incomingMessages.emit(DuqIncomingMessage(messageId, role, content)) }
+    }
+
     // Одно ядро/агент. Оставлено для совместимости API с прежним gateway.
     val activeAgentId: String = "main"
 

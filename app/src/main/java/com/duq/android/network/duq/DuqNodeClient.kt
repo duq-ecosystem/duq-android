@@ -41,6 +41,7 @@ import kotlin.math.pow
 @Singleton
 class DuqNodeClient @Inject constructor(
     private val executor: PhoneCommandExecutor,
+    private val chatClient: DuqChatClient,
     private val logger: Logger
 ) {
     companion object {
@@ -121,8 +122,18 @@ class DuqNodeClient @Inject constructor(
         }.getOrNull() ?: return
         when (frame["type"]) {
             "phone.command" -> handleCommand(frame)
+            "chat.message" -> handleChatMessage(frame)
             // "pong" and reasoning frames are ignored by the node host.
         }
+    }
+
+    /** Live chat message pushed from the core — hand to the chat client to render. */
+    private fun handleChatMessage(frame: Map<String, Any?>) {
+        val messageId = frame["message_id"] as? String ?: return
+        val role = frame["role"] as? String ?: "assistant"
+        val content = frame["content"] as? String ?: return
+        logger.d(TAG, "chat.message id=${messageId.take(8)} role=$role len=${content.length}")
+        chatClient.onIncomingMessage(messageId, role, content)
     }
 
     private fun handleCommand(frame: Map<String, Any?>) {

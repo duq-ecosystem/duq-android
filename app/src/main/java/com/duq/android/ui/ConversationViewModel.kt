@@ -11,6 +11,7 @@ import com.duq.android.data.model.MessageRole
 import com.duq.android.data.model.VoicePhase
 import com.duq.android.error.DuqError
 import com.duq.android.network.duq.DuqChatClient
+import com.duq.android.network.duq.DuqIncomingMessage
 import com.duq.android.network.openclaw.GatewayConnectionState
 import com.duq.android.network.openclaw.OcAgentStep
 import com.duq.android.network.openclaw.OcChatEvent
@@ -151,6 +152,28 @@ class ConversationViewModel @Inject constructor(
         override fun removeEldestEntry(eldest: Map.Entry<String, Boolean>) = size > 32
     }
 
+    // Live-синк: серверные id уже отрендеренных push-сообщений (идемпотентность —
+    // один и тот же push/реконнект не задвоит). Bounded LRU.
+    private val seenServerMsgIds = object : LinkedHashMap<String, Boolean>(16, 0.75f, false) {
+        override fun removeEldestEntry(eldest: Map.Entry<String, Boolean>) = size > 128
+    }
+
+    /** Совпадает ли (role, content) с одним из последних сообщений (echo своих
+     *  отправок / уже отрисованного REST-ответа / перекрытия с историей). */
+    private fun isRecentDuplicate(role: MessageRole, content: String): Boolean {
+        val norm = content.trim()
+        return _messages.value.takeLast(8).any { it.role == role && it.content.trim() == norm }
+    }
+
+    /** Live-сообщение беседы из push (/duq/ws): рендерим, если не дубль. */
+    private fun handleIncomingMessage(msg: DuqIncomingMessage) {
+        if (msg.content.isBlank()) return
+        if (seenServerMsgIds.put(msg.messageId, true) != null) return  // уже видели этот id
+        val role = MessageRole.fromApiString(msg.role)
+        if (isRecentDuplicate(role, msg.content)) return  // своё/REST/история — не дублируем
+        _messages.update { it + Message(id = msg.messageId, role = role, content = msg.content) }
+    }
+
     private val flog = com.duq.android.logging.FileLogger(context)
 
     /** An agent the user can switch the chat to (real gateway agent ids + a hint). */
@@ -234,6 +257,9 @@ class ConversationViewModel @Inject constructor(
         }
         viewModelScope.launch {
             gatewayClient.agentSteps.collect { step -> handleAgentStep(step) }
+        }
+        viewModelScope.launch {
+            gatewayClient.incomingMessages.collect { msg -> handleIncomingMessage(msg) }
         }
     }
 
@@ -336,10 +362,15 @@ class ConversationViewModel @Inject constructor(
                 // Also settle any tool steps whose "end" frame never arrived, so the
                 // collapsed block doesn't keep a spinner after the reply is done.
                 _messages.update { msgs ->
-                    val updated = if (msgs.any { it.id == event.runId }) {
-                        msgs.map { if (it.id == event.runId) it.copy(content = finalContent, isStreaming = false) else it }
-                    } else {
-                        msgs + Message(id = event.runId, role = MessageRole.ASSISTANT, content = finalContent, isStreaming = false)
+                    val updated = when {
+                        msgs.any { it.id == event.runId } ->
+                            msgs.map { if (it.id == event.runId) it.copy(content = finalContent, isStreaming = false) else it }
+                        // Live-push мог уже отрисовать этот же ответ (гонка push↔REST) —
+                        // не дублируем по содержимому.
+                        msgs.takeLast(8).any { it.role == MessageRole.ASSISTANT && it.content.trim() == finalContent.trim() } ->
+                            msgs
+                        else ->
+                            msgs + Message(id = event.runId, role = MessageRole.ASSISTANT, content = finalContent, isStreaming = false)
                     }
                     ChatStepReducer.markAllStepsDone(updated, event.runId)
                 }
