@@ -192,9 +192,11 @@ class ConversationViewModel @Inject constructor(
                 return
             }
         }
+        // Озвучка решения модели — ДО дедупа пузыря: даже если пузырь-дубликат (история/
+        // REST), голос озвучить нужно (spokenMsgIds защитит от повторного синтеза).
+        if (msg.voice && role == MessageRole.ASSISTANT) speakReply(msg.messageId, msg.content)
         if (isRecentDuplicate(role, msg.content)) return  // своё/REST/история — не дублируем
         _messages.update { it + Message(id = msg.messageId, role = role, content = msg.content) }
-        if (msg.voice && role == MessageRole.ASSISTANT) speakReply(msg.messageId, msg.content)
     }
 
     private val flog = com.duq.android.logging.FileLogger(context)
@@ -587,15 +589,19 @@ class ConversationViewModel @Inject constructor(
     private fun speakReply(messageId: String, text: String) {
         if (text.isBlank()) return
         if (!spokenMsgIds.add(messageId)) return
+        Log.i(TAG, "speakReply start id=${messageId.take(8)} len=${text.length}")
         viewModelScope.launch {
             val audio = try {
                 // On-device синтез (sherpa-onnx + Piper); null → fallback на серверный /tts.
-                ttsLocal.trySynthesize(text, messageId) ?: ttsClient.synthesize(text, messageId)
+                val onDevice = ttsLocal.trySynthesize(text, messageId)
+                Log.i(TAG, "speakReply on-device=${if (onDevice != null) "ok(${onDevice.length()}b)" else "null→server"}")
+                onDevice ?: ttsClient.synthesize(text, messageId)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 Log.e(TAG, "TTS failed: ${e.message}"); null
-            } ?: return@launch
+            } ?: run { Log.e(TAG, "speakReply: no audio (both null)"); return@launch }
+            Log.i(TAG, "speakReply play id=${messageId.take(8)} bytes=${audio.length()}")
             // Помечаем сообщение как голосовое → в пузыре появляется кнопка play/pause
             // (как в Telegram): можно переслушать ответ, а не только разовое авто-проигрывание.
             _messages.update { msgs ->
