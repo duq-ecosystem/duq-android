@@ -141,6 +141,16 @@ android {
             // collides during resource merge — drop the duplicate.
             excludes += "/META-INF/versions/9/OSGI-INF/MANIFEST.MF"
         }
+        jniLibs {
+            // sherpa-onnx (on-device TTS) несёт libonnxruntime.so 1.24.3; Silero VAD
+            // тянет onnxruntime-android 1.22.0 со СВОЕЙ libonnxruntime.so → одинаковый
+            // путь, merge-конфликт. onnxruntime C API обратно совместим, поэтому
+            // НОВЕЙШАЯ .so (1.24.3 от sherpa) корректно обслуживает и VAD (Java-API
+            // 1.22 вызывает подмножество C API). sherpa объявлен в deps РАНЬШЕ VAD →
+            // pickFirst детерминированно оставляет именно 1.24.3 (проверено: merged
+            // .so = sherpa-сборка). Не «случайно одну», а новейшую обратно-совместимую.
+            pickFirsts += "**/libonnxruntime.so"
+        }
     }
 
     testOptions {
