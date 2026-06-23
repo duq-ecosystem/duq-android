@@ -84,8 +84,10 @@ data class ConversationDto(
 
 /** Одно сообщение из GET /duq/api/conversations/{id}/messages. */
 data class HistoryMsg(
+    val id: String? = null,         // серверный id — нужен как ключ кэша озвучки при replay
     val role: String,    // "user" | "assistant"
-    val content: String
+    val content: String,
+    val has_audio: Boolean = false  // ответ был озвучен → показать кнопку play в истории
 )
 
 /**
@@ -129,7 +131,9 @@ data class OcAgentStep(
 /** Одно прошлое сообщение из истории беседы (role/text), render-ready. */
 data class OcHistoryMsg(
     val role: String,  // "user" | "assistant"
-    val text: String
+    val text: String,
+    val id: String? = null,        // серверный id (ключ кэша озвучки)
+    val hasAudio: Boolean = false  // ответ был озвучен → кнопка play в истории
 )
 
 /**

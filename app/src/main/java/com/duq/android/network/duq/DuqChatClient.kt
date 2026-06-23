@@ -226,7 +226,7 @@ class DuqChatClient @Inject constructor(
         }
         return msgs
             .filter { it.role == "user" || it.role == "assistant" }
-            .map { OcHistoryMsg(it.role, it.content) }
+            .map { OcHistoryMsg(it.role, it.content, it.id, it.has_audio) }
             .takeLast(limit)
     }
 

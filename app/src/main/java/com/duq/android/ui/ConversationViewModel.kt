@@ -296,7 +296,12 @@ class ConversationViewModel @Inject constructor(
             // Применяем только если пользователь не переключился снова за время загрузки.
             if (_activeConversationId.value != id) return@launch
             _messages.value = history.map {
-                Message(role = MessageRole.fromApiString(it.role), content = it.text)
+                Message(
+                    id = it.id ?: java.util.UUID.randomUUID().toString(),
+                    role = MessageRole.fromApiString(it.role),
+                    content = it.text,
+                    hasAudio = it.hasAudio,
+                )
             }
             flog.i(TAG, "selectConversation($id): ${history.size} messages")
         }
@@ -335,7 +340,14 @@ class ConversationViewModel @Inject constructor(
             flog.i(TAG, "restoreServerHistory: conv=${first.id} ${history.size} messages")
             if (history.isEmpty()) return@launch
             val restored = history.map {
-                Message(role = MessageRole.fromApiString(it.role), content = it.text)
+                // id серверный (ключ кэша озвучки → replay по тапу), hasAudio → кнопка play
+                // переживает перезагрузку истории (раньше id был случайный, hasAudio=false).
+                Message(
+                    id = it.id ?: java.util.UUID.randomUUID().toString(),
+                    role = MessageRole.fromApiString(it.role),
+                    content = it.text,
+                    hasAudio = it.hasAudio,
+                )
             }
             // Seed from the server transcript ONLY while the chat is still empty —
             // the normal cold-start case. If a reply already streamed in during the
@@ -603,6 +615,31 @@ class ConversationViewModel @Inject constructor(
     // Уже озвученные ответы — чтобы chat.message-voice и task-result-voice (два пути
     // доставки решения модели) не синтезировали один ответ дважды.
     private val spokenMsgIds = java.util.Collections.synchronizedSet(mutableSetOf<String>())
+
+    /**
+     * Тап по кнопке play на сообщении. Если озвучка ещё в кэше плеера — просто
+     * play/pause. Если кэш стёрт (рестарт/OS почистил cacheDir/перезагрузка истории) —
+     * РЕ-СИНТЕЗ on-device по тексту сообщения под тем же messageId, затем играем.
+     * Так голос «сохраняется» (replay работает всегда), а не только сразу после ответа.
+     */
+    fun playMessageAudio(messageId: String) {
+        if (audioPlaybackManager.isCached(messageId)) {
+            audioPlaybackManager.playOrToggle(messageId)
+            return
+        }
+        val msg = _messages.value.firstOrNull { it.id == messageId } ?: return
+        if (msg.content.isBlank()) return
+        viewModelScope.launch {
+            val audio = try {
+                ttsLocal.trySynthesize(msg.content, messageId) ?: ttsClient.synthesize(msg.content, messageId)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.e(TAG, "replay synth failed: ${e.message}"); null
+            } ?: return@launch
+            audioPlaybackManager.play(messageId, audio)
+        }
+    }
 
     private fun speakReply(messageId: String, text: String) {
         if (text.isBlank()) return

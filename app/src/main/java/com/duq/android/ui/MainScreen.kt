@@ -488,7 +488,8 @@ fun MainScreen(
                 messages = messages,
                 audioPlaybackInfo = audioPlaybackInfo,
                 onAudioPlayPauseClick = { messageId ->
-                    audioPlaybackManager.playOrToggle(messageId)
+                    // Через VM: ре-синтез on-device если кэш озвучки стёрт (replay из истории).
+                    viewModel.playMessageAudio(messageId)
                 },
                 hazeState = hazeState,
                 modifier = Modifier
