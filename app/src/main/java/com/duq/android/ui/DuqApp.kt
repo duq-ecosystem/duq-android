@@ -51,6 +51,11 @@ private const val START_TAB = "tab_chat"
  *  потребляет и навигирует к разделу. */
 object DeepLinkState {
     var pendingSection by mutableStateOf<String?>(null)
+    // Deep-link на ВКЛАДКУ нижней навигации (route, напр. "tab_chat"). Тап по обычному
+    // message-пушу (и сервисному «Connected») ведёт сюда → чат, а не оставляет на той
+    // панели, где app был свёрнут. Каждый пуш ОБЯЗАН нести цель-панель, иначе warm-тап
+    // молча возрождает прошлый экран (повторяющийся баг «не переводит на панель»).
+    var pendingTab by mutableStateOf<String?>(null)
 }
 
 @EntryPoint
@@ -132,6 +137,21 @@ private fun MainShell(
         DeepLinkState.pendingSection?.let { key ->
             tabNav.navigate("section/$key")
             DeepLinkState.pendingSection = null
+        }
+    }
+
+    // Deep-link на вкладку (тап по обычному message-пушу → чат). Без этого warm-тап
+    // оставлял юзера на прошлой панели (Пульт/раздел), а сообщение — в чате.
+    LaunchedEffect(DeepLinkState.pendingTab) {
+        DeepLinkState.pendingTab?.let { route ->
+            keyboardController?.hide()
+            focusManager.clearFocus(force = true)
+            tabNav.navigate(route) {
+                popUpTo(tabNav.graph.findStartDestination().id) { saveState = true }
+                launchSingleTop = true
+                restoreState = true
+            }
+            DeepLinkState.pendingTab = null
         }
     }
 

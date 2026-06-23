@@ -30,7 +30,10 @@ class DuqNotificationManager @Inject constructor(
     /** Persistent foreground service notification — minimal, silent */
     fun createServiceNotification(): Notification {
         val openIntent = PendingIntent.getActivity(
-            context, 0, Intent(context, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE
+            context, 0,
+            // Тап по сервисному «Connected» → чат (а не прошлая панель).
+            Intent(context, MainActivity::class.java).apply { putExtra("open_tab", "tab_chat") },
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
         val stopIntent = PendingIntent.getService(
             context, 0,
@@ -96,6 +99,9 @@ class DuqNotificationManager @Inject constructor(
             when (type) {
                 "core_update" -> putExtra("open_section", "version")
                 "digest" -> putExtra("open_notifications", "digest")
+                // message и любой прочий тип → вкладка чата (панель сообщения). Без явной
+                // цели warm-тап оставлял юзера на той панели, где app был свёрнут.
+                else -> putExtra("open_tab", "tab_chat")
             }
         }
         return PendingIntent.getActivity(
