@@ -579,7 +579,10 @@ class ConversationViewModel @Inject constructor(
                 val convId = _activeConversationId.value
                 val isNew = pendingNewConversation
                 pendingNewConversation = false
-                gatewayClient.sendMessage(transcript, conversationId = convId, newConversation = isNew)
+                gatewayClient.sendMessage(
+                    transcript, conversationId = convId, newConversation = isNew,
+                    agentId = _activeAgentId.value,   // голос тоже уходит выбранному агенту, не всегда main
+                )
                 armReplyWatchdog()
             } catch (e: CancellationException) {
                 removePendingVoice()

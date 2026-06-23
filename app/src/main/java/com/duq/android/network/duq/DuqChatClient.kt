@@ -46,7 +46,7 @@ import javax.inject.Singleton
  * корректно отрисовывает ConversationViewModel (вставит сообщение, снимет спиннер) и
  * показывает фоновое уведомление в DuqListenerService. Ошибка ядра → `state="error"`.
  *
- * Ядро одноагентное: [activeAgentId] фиксировано "main"; tool-шаги ([agentSteps])
+ * Агент выбирается на отправке ([sendMessage] agentId). Tool-шаги ([agentSteps])
  * приходят live через reasoning по /duq/ws (см. [onReasoning]).
  */
 @Singleton
@@ -85,9 +85,6 @@ class DuqChatClient @Inject constructor(
     ) {
         scope.launch { _incomingMessages.emit(DuqIncomingMessage(messageId, role, content, conversationId, voice)) }
     }
-
-    // Одно ядро/агент. Оставлено для совместимости API с прежним gateway.
-    val activeAgentId: String = "main"
 
     /**
      * REST stateless — реального коннекта нет. Помечаем CONNECTED, чтобы потребители,
