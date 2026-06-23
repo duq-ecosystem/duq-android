@@ -137,6 +137,37 @@ class DuqRestClient @Inject constructor(
         }
     }
 
+    /** Доступные тулы (имена) — для назначения тулсета агенту в панели. */
+    suspend fun listTools(): List<String> = withContext(Dispatchers.IO) {
+        val req = Request.Builder().url(url("tools")).withServerAuth().get().build()
+        httpClient.newCall(req).execute().use { resp ->
+            val raw = resp.body?.string().orEmpty()
+            if (!resp.isSuccessful) throw DuqApiException("tools ${resp.code}")
+            gson.fromJson(raw, ToolsResponse::class.java)?.tools ?: emptyList()
+        }
+    }
+
+    /** Создать/обновить агента (панель в Пульте). allowedTools=null → все тулы. */
+    suspend fun createAgent(
+        id: String, displayName: String, description: String, allowedTools: List<String>?
+    ) = withContext(Dispatchers.IO) {
+        val body = gson.toJson(AgentCreateBody(id, displayName, description, allowedTools)).toRequestBody(JSON)
+        val req = Request.Builder().url(url("agents")).withServerAuth().post(body).build()
+        httpClient.newCall(req).execute().use { resp ->
+            if (!resp.isSuccessful)
+                throw DuqApiException("createAgent ${resp.code}: ${resp.body?.string()?.take(200)}")
+        }
+    }
+
+    /** Удалить агента (системный main удалить нельзя — ядро вернёт 400). */
+    suspend fun deleteAgent(id: String) = withContext(Dispatchers.IO) {
+        val req = Request.Builder().url(url("agents/$id")).withServerAuth().delete().build()
+        httpClient.newCall(req).execute().use { resp ->
+            if (!resp.isSuccessful && resp.code != 404)
+                throw DuqApiException("deleteAgent ${resp.code}: ${resp.body?.string()?.take(200)}")
+        }
+    }
+
     /** Сообщения одного диалога. */
     suspend fun messages(convId: String): List<HistoryMsg> = withContext(Dispatchers.IO) {
         val req = Request.Builder().url(url("conversations/$convId/messages")).withServerAuth().withBearer().get().build()
@@ -269,6 +300,15 @@ data class CronCreateBody(
     val skill: String,
     val timezone: String,
     @com.google.gson.annotations.SerializedName("agent_id") val agentId: String = "main",
+)
+
+data class ToolsResponse(val tools: List<String> = emptyList())
+
+data class AgentCreateBody(
+    val id: String,
+    @com.google.gson.annotations.SerializedName("display_name") val displayName: String,
+    val description: String,
+    @com.google.gson.annotations.SerializedName("allowed_tools") val allowedTools: List<String>?,
 )
 data class CronEnabledBody(val enabled: Boolean)
 data class CronPatchBody(val cron: String?, val skill: String?, val name: String?)

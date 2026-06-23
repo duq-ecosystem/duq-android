@@ -36,7 +36,9 @@ data class MessageRequest(
 data class AgentInfo(
     val id: String,
     @SerializedName("display_name") val displayName: String,
-    val description: String = ""
+    val description: String = "",
+    @SerializedName("allowed_tools") val allowedTools: List<String>? = null,
+    @SerializedName("is_system") val isSystem: Boolean = false
 )
 
 /** Ответ GET /duq/api/agents. */

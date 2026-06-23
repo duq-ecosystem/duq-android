@@ -389,7 +389,7 @@ private fun autoFieldColors() = OutlinedTextFieldDefaults.colors(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun AutoField(value: String, onChange: (String) -> Unit, label: String, minLines: Int = 1) {
+internal fun AutoField(value: String, onChange: (String) -> Unit, label: String, minLines: Int = 1) {
     OutlinedTextField(
         value = value, onValueChange = onChange,
         label = { Text(label) }, minLines = minLines,

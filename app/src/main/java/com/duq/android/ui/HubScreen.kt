@@ -47,6 +47,7 @@ data class HubSection(val key: String, val icon: ImageVector, val title: String)
 /** Разделы пульта — пока только «Движок» (обновление ядра
  *  через /core-update). Прежние gateway-RPC разделы убраны — у ядра DUQ нет RPC. */
 val HUB_SECTIONS = listOf(
+    HubSection("agents", Icons.Outlined.Psychology, "Агенты"),
     HubSection("skills", Icons.Outlined.AutoAwesome, "Скиллы"),
     HubSection("schedule", Icons.Outlined.Schedule, "Задачи"),
     HubSection("version", Icons.Outlined.SystemUpdateAlt, "Версия"),

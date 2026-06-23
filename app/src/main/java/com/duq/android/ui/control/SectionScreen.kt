@@ -33,6 +33,7 @@ import com.duq.android.ui.theme.DuqColors
 @Composable
 fun SectionScreen(sectionKey: String, onBack: () -> Unit, vm: SectionViewModel = hiltViewModel()) {
     when (sectionKey) {
+        "agents" -> AgentsScreen(onBack)
         "skills" -> SkillsScreen(onBack)
         "schedule" -> ScheduleScreen(onBack)
         else -> VersionScreen(vm, onBack)   // "version" (+ legacy "engine")
