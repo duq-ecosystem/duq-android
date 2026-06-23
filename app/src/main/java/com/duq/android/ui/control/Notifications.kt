@@ -165,9 +165,9 @@ private fun ClearRow(onClear: () -> Unit) {
 @Composable
 private fun NotifList(items: List<NotificationInbox.Item>, vm: NotificationsViewModel) {
     if (items.isEmpty()) { EmptyShade("Пока нет уведомлений"); return }
-    ClearRow { vm.clearNotifs() }
     var expandedId by remember { mutableStateOf<Long?>(null) }
     LazyColumn(Modifier.fillMaxWidth().heightIn(max = 440.dp).padding(horizontal = 16.dp)) {
+        item { ClearRow { vm.clearNotifs() } }
         items(items, key = { it.id }) { item ->
             val icon = when (item.type) { "update" -> "⬆"; "message" -> "💬"; else -> "🔔" }
             val expanded = expandedId == item.id
@@ -195,9 +195,9 @@ private fun NotifList(items: List<NotificationInbox.Item>, vm: NotificationsView
 @Composable
 private fun DigestList(items: List<NotificationInbox.Item>, vm: NotificationsViewModel) {
     if (items.isEmpty()) { EmptyShade("Пока нет выпусков"); return }
-    ClearRow { vm.clearDigests() }
     var expandedId by remember { mutableStateOf<Long?>(null) }
     LazyColumn(Modifier.fillMaxWidth().heightIn(max = 440.dp).padding(horizontal = 16.dp)) {
+        item { ClearRow { vm.clearDigests() } }
         items(items, key = { it.id }) { item ->
             val expanded = expandedId == item.id
             Column(
