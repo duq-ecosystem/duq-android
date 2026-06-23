@@ -15,6 +15,17 @@
 -keepclassmembers class com.konovalov.vad.** { *; }
 
 # -----------------------------------------------------------
+# SHERPA-ONNX (On-device TTS — k2-fsa, JNI)
+# -----------------------------------------------------------
+# Нативная libsherpa-onnx-jni.so резолвит config-классы/поля по ТОЧНОМУ имени через
+# JNI GetFieldID (напр. OfflineTtsConfig.model : OfflineTtsModelConfig). R8-обфускация
+# переименовывает их → краш "NoSuchFieldError: no type Lcom/k2fsa/sherpa/onnx/
+# OfflineTtsModelConfig; ... field model" в OfflineTts.newFromFile (release-билд).
+# Как Porcupine/Silero VAD — держим весь пакет как есть.
+-keep class com.k2fsa.sherpa.onnx.** { *; }
+-keepclassmembers class com.k2fsa.sherpa.onnx.** { *; }
+
+# -----------------------------------------------------------
 # OKHTTP & OKIO (Networking)
 # -----------------------------------------------------------
 -dontwarn okhttp3.**
