@@ -143,37 +143,41 @@ private fun AgentSheet(
     val picked = remember { mutableStateListOf<String>().apply { initial?.allowedTools?.let { addAll(it) } } }
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheet, containerColor = DuqColors.surfaceElevated) {
-        Column(
-            Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 28.dp)
-                .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
-        ) {
-            Text(
-                if (editMode) "Редактировать агента" else "Новый агент",
-                color = DuqColors.textPrimary, fontSize = 18.sp, fontWeight = FontWeight.SemiBold
-            )
-            // id — ключ агента, при редактировании не меняется (показываем как текст).
-            if (editMode) {
-                Text("id: ${initial!!.id}", color = DuqColors.textSecondary, fontSize = 13.sp)
-            } else {
-                AutoField(id, { id = it.lowercase().filter { c -> c.isLetterOrDigit() || c == '-' } }, "id (латиница, напр. recruiter)")
+        Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 28.dp)) {
+            // Прокручиваемая часть (поля + длинный список тулов). Кнопка вынесена ИЗ
+            // скролла и зафиксирована снизу — иначе при большом тулсете она уезжала за
+            // экран и до неё было не докрутить.
+            Column(
+                Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                Text(
+                    if (editMode) "Редактировать агента" else "Новый агент",
+                    color = DuqColors.textPrimary, fontSize = 18.sp, fontWeight = FontWeight.SemiBold
+                )
+                // id — ключ агента, при редактировании не меняется (показываем как текст).
+                if (editMode) {
+                    Text("id: ${initial!!.id}", color = DuqColors.textSecondary, fontSize = 13.sp)
+                } else {
+                    AutoField(id, { id = it.lowercase().filter { c -> c.isLetterOrDigit() || c == '-' } }, "id (латиница, напр. recruiter)")
+                }
+                AutoField(name, { name = it }, "Имя агента")
+                AutoField(desc, { desc = it }, "Описание (зачем агент)")
+
+                Text(
+                    if (picked.isEmpty()) "Тулсет: все тулы (по правам). Выбери, чтобы ОГРАНИЧИТЬ:"
+                    else "Тулсет агента (${picked.size} выбрано):",
+                    color = DuqColors.textSecondary, fontSize = 13.sp
+                )
+                FlowRowTools(tools, picked)
             }
-            AutoField(name, { name = it }, "Имя агента")
-            AutoField(desc, { desc = it }, "Описание (зачем агент)")
-
-            Text(
-                if (picked.isEmpty()) "Тулсет: все тулы (по правам). Выбери, чтобы ОГРАНИЧИТЬ:"
-                else "Тулсет агента (${picked.size} выбрано):",
-                color = DuqColors.textSecondary, fontSize = 13.sp
-            )
-            FlowRowTools(tools, picked)
-
+            Spacer(Modifier.height(12.dp))
             Button(
                 onClick = { if (id.isNotBlank() && name.isNotBlank()) onSave(id, name, desc, picked.toList()) },
                 enabled = id.isNotBlank() && name.isNotBlank(),
                 colors = ButtonDefaults.buttonColors(containerColor = DuqColors.primary, contentColor = DuqColors.background),
                 modifier = Modifier.fillMaxWidth()
-            ) { Text("Создать агента") }
+            ) { Text(if (editMode) "Сохранить" else "Создать агента") }
         }
     }
 }
