@@ -48,10 +48,13 @@ class AgentsViewModel @Inject constructor(
 
     private fun mutate(block: suspend () -> Unit) = viewModelScope.launch {
         _state.update { it.copy(busy = true, error = null) }
-        runCatching { block() }
+        val ok = runCatching { block() }
             .onFailure { e -> _state.update { it.copy(error = e.message ?: "Ошибка") } }
+            .isSuccess
         _state.update { it.copy(busy = false) }
-        load()
+        // load() только при успехе: иначе он сразу обнулит error (error=null в начале load),
+        // и пользователь увидит лишь вспышку ошибки. При ошибке список и так не изменился.
+        if (ok) load()
     }
 
     /** allowedTools пустой/null → агент без доп. сужения (все тулы по правам юзера). */
