@@ -58,6 +58,19 @@ class NotificationInbox @Inject constructor(
         _unread.value = 0
     }
 
+    /** Очистить только дайджесты (вкладка «Дайджесты»), уведомления не трогая. */
+    fun clearDigests() = removeMatching { it.type == "digest" }
+
+    /** Очистить только уведомления (вкладка «Уведомления»), дайджесты не трогая. */
+    fun clearNotifs() = removeMatching { it.type != "digest" }
+
+    private fun removeMatching(remove: (Item) -> Boolean) = synchronized(LOCK) {
+        val updated = load(context).filterNot(remove)
+        prefs(context).edit().putString(KEY, gson.toJson(updated)).commit()
+        _items.value = updated
+        _unread.value = computeUnread(context, updated)
+    }
+
     companion object {
         private const val PREFS = "duq_inbox"
         private const val KEY = "items"
