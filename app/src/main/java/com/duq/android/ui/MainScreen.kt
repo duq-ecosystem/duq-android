@@ -496,37 +496,6 @@ fun MainScreen(
                 ) { Icon(Icons.Outlined.Search,
                     contentDescription = "\u041f\u043e\u0438\u0441\u043a", tint = DuqColors.textSecondary, modifier = Modifier.size(22.dp)) }
                 Spacer(modifier = Modifier.width(8.dp))
-                // \ud83d\udcf0 \u0424\u0438\u043d\u0430\u043d\u0441\u043e\u0432\u044b\u0439 \u0434\u0430\u0439\u0434\u0436\u0435\u0441\u0442 \u2014 \u043e\u0442\u0434\u0435\u043b\u044c\u043d\u0430\u044f \u043b\u0435\u043d\u0442\u0430 (\u0440\u0430\u0441\u0441\u044b\u043b\u043a\u0430, \u043d\u0435 \u0447\u0430\u0442)
-                Box(
-                    modifier = Modifier
-                        .size(44.dp)
-                        .clip(CircleShape)
-                        .background(DuqColors.surfaceVariant)
-                        .clickable(onClick = onOpenDigest),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(Icons.Outlined.Article,
-                        contentDescription = "\u0414\u0430\u0439\u0434\u0436\u0435\u0441\u0442", tint = DuqColors.textSecondary, modifier = Modifier.size(22.dp))
-                    if (digestItems.isNotEmpty()) {
-                        Box(
-                            modifier = Modifier
-                                .align(Alignment.TopEnd)
-                                .padding(6.dp)
-                                .size(16.dp)
-                                .clip(CircleShape)
-                                .background(DuqColors.primary),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = if (digestItems.size > 9) "9+" else digestItems.size.toString(),
-                                fontSize = 9.sp, color = Color.Black, fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.width(8.dp))
-
                 // Notification history (bell) with unread-style count badge
                 Box(
                     modifier = Modifier
