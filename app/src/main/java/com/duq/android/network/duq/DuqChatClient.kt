@@ -135,6 +135,9 @@ class DuqChatClient @Inject constructor(
         }
     }
 
+    /** Реестр агентов ядра (профили тулсета) для пикера. */
+    suspend fun listAgents(): List<AgentInfo> = rest.listAgents()
+
     /**
      * Reasoning-событие из ядра (по /duq/ws, [DuqNodeClient]) → шаг агента в пузыре
      * текущего тёрна. Показываем порядок действий агента (какой tool вызвал) live —

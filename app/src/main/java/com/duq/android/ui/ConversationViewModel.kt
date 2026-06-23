@@ -213,10 +213,37 @@ class ConversationViewModel @Inject constructor(
     // Следующая отправка должна начать НОВЫЙ диалог (взведено кнопкой «Новый чат»).
     @Volatile private var pendingNewConversation = false
 
+    // Мульти-агенты: реестр агентов (из /api/agents) + выбранный агент. Каждый
+    // агент = своя сессия/память/тулсет (ядро изолирует по agent_id). Смена агента
+    // = свой чат: чистим видимую историю и начинаем сессию выбранного агента.
+    private val _agents = MutableStateFlow<List<com.duq.android.network.duq.AgentInfo>>(emptyList())
+    val agents: StateFlow<List<com.duq.android.network.duq.AgentInfo>> = _agents.asStateFlow()
+    private val _activeAgentId = MutableStateFlow("main")
+    val activeAgentId: StateFlow<String> = _activeAgentId.asStateFlow()
+
+    fun loadAgents() {
+        viewModelScope.launch {
+            runCatching { gatewayClient.listAgents() }
+                .onSuccess { _agents.value = it }
+                .onFailure { Log.w(TAG, "loadAgents failed: ${it.message}") }
+        }
+    }
+
+    /** Switch active agent — own isolated session: clear visible history, fresh chat. */
+    fun switchAgent(agentId: String) {
+        if (agentId == _activeAgentId.value) return
+        _activeAgentId.value = agentId
+        _messages.value = emptyList()
+        _activeConversationId.value = null
+        pendingNewConversation = true
+        _activeConversationTitle.value = _agents.value.firstOrNull { it.id == agentId }?.displayName ?: "DUQ"
+    }
+
     init {
         gatewayClient.start()
         collectChatEvents()
         refreshUpdateState()
+        loadAgents()
         restoreServerHistory()
     }
 
@@ -463,7 +490,10 @@ class ConversationViewModel @Inject constructor(
         pendingNewConversation = false
         viewModelScope.launch {
             try {
-                gatewayClient.sendMessage(text, runId, conversationId = convId, newConversation = isNew)
+                gatewayClient.sendMessage(
+                    text, runId, conversationId = convId, newConversation = isNew,
+                    agentId = _activeAgentId.value,
+                )
                 armReplyWatchdog()
             } catch (e: Exception) {
                 Log.e(TAG, "sendMessage failed: ${e.message}")

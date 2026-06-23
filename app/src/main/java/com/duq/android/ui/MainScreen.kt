@@ -12,6 +12,8 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
@@ -107,6 +109,8 @@ fun MainScreen(
     val conversations by viewModel.conversations.collectAsState()
     val activeConversationId by viewModel.activeConversationId.collectAsState()
     val activeConversationTitle by viewModel.activeConversationTitle.collectAsState()
+    val agents by viewModel.agents.collectAsState()
+    val activeAgentId by viewModel.activeAgentId.collectAsState()
     // Which inbox row is expanded to full text (null = all collapsed).
     var expandedItemId by remember { mutableStateOf<Long?>(null) }
 
@@ -269,8 +273,8 @@ fun MainScreen(
     }
 
 
-    // Переключатель диалогов — список бесед из /conversations + «Новый чат».
-    // (Ядро одноагентное: переключаемся между беседами, а не агентами.)
+    // Переключатель диалогов — выбор агента (мульти-агенты, каждый со своим
+    // чатом/памятью/тулсетом) + список бесед из /conversations + «Новый чат».
     if (showConversationPicker) {
         ModalBottomSheet(
             onDismissRequest = { showConversationPicker = false },
@@ -306,6 +310,38 @@ fun MainScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(text = "＋ Новый чат", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = DuqColors.primary)
+                    }
+                }
+                // Мульти-агенты: выбор агента. Каждый агент = свой чат/память/тулсет
+                // (ядро изолирует по agent_id). Смена агента стартует его сессию.
+                if (agents.size > 1) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState())
+                            .padding(bottom = 14.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        agents.forEach { agent ->
+                            val sel = agent.id == activeAgentId
+                            Text(
+                                text = agent.displayName,
+                                fontSize = 14.sp,
+                                fontWeight = if (sel) FontWeight.Bold else FontWeight.Medium,
+                                color = if (sel) DuqColors.primary else DuqColors.textSecondary,
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(20.dp))
+                                    .background(
+                                        if (sel) DuqColors.primary.copy(alpha = 0.15f)
+                                        else DuqColors.surfaceElevated
+                                    )
+                                    .clickable {
+                                        viewModel.switchAgent(agent.id)
+                                        showConversationPicker = false
+                                    }
+                                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                            )
+                        }
                     }
                 }
                 if (conversations.isEmpty()) {
