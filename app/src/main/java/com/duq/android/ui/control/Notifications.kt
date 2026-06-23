@@ -109,13 +109,18 @@ fun GlobalTopActions(vm: NotificationsViewModel = hiltViewModel()) {
 fun NotificationsShade(vm: NotificationsViewModel = hiltViewModel()) {
     if (!AppChrome.showNotifications) return
     val all by vm.items.collectAsState()
-    LaunchedEffect(Unit) { vm.refresh(); vm.markOpened() }
 
     val notifs = all.filter { it.type != "digest" }
     val digests = all.filter { it.type == "digest" }
     val pager = rememberPagerState(initialPage = AppChrome.notificationsTab, pageCount = { 2 })
     val scope = rememberCoroutineScope()
     val tabs = listOf("Уведомления", "Дайджесты")
+
+    LaunchedEffect(Unit) { vm.refresh(); vm.markOpened() }
+    // Открыли по пушу дайджеста (или сменили запрошенный таб) → форсим нужный таб.
+    // rememberPagerState(initialPage) не реагирует на смену значения после создания,
+    // поэтому двигаем пейджер явно — и при первом открытии, и если шторка уже открыта.
+    LaunchedEffect(AppChrome.notificationsTab) { pager.scrollToPage(AppChrome.notificationsTab) }
 
     ModalBottomSheet(
         onDismissRequest = { AppChrome.showNotifications = false },
