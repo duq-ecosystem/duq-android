@@ -79,8 +79,11 @@ class DuqChatClient @Inject constructor(
     val incomingMessages: SharedFlow<DuqIncomingMessage> = _incomingMessages.asSharedFlow()
 
     /** Вызывается WS-клиентом ([DuqNodeClient]) на каждый live-фрейм chat.message. */
-    fun onIncomingMessage(messageId: String, role: String, content: String, conversationId: String?) {
-        scope.launch { _incomingMessages.emit(DuqIncomingMessage(messageId, role, content, conversationId)) }
+    fun onIncomingMessage(
+        messageId: String, role: String, content: String,
+        conversationId: String?, voice: Boolean = false,
+    ) {
+        scope.launch { _incomingMessages.emit(DuqIncomingMessage(messageId, role, content, conversationId, voice)) }
     }
 
     // Одно ядро/агент. Оставлено для совместимости API с прежним gateway.

@@ -187,11 +187,14 @@ class ConversationViewModel @Inject constructor(
                     }
                     ChatStepReducer.markAllStepsDone(upd, rid)
                 }
+                // Модель решила озвучить → синтез TTS на пузыре этого тёрна.
+                if (msg.voice) speakReply(rid, ReplyText.clean(msg.content))
                 return
             }
         }
         if (isRecentDuplicate(role, msg.content)) return  // своё/REST/история — не дублируем
         _messages.update { it + Message(id = msg.messageId, role = role, content = msg.content) }
+        if (msg.voice && role == MessageRole.ASSISTANT) speakReply(msg.messageId, msg.content)
     }
 
     private val flog = com.duq.android.logging.FileLogger(context)
@@ -577,8 +580,13 @@ class ConversationViewModel @Inject constructor(
     }
 
     /** Synthesize + play the reply audio (contextual TTS for voice turns only). */
+    // Уже озвученные ответы — чтобы chat.message-voice и task-result-voice (два пути
+    // доставки решения модели) не синтезировали один ответ дважды.
+    private val spokenMsgIds = java.util.Collections.synchronizedSet(mutableSetOf<String>())
+
     private fun speakReply(messageId: String, text: String) {
         if (text.isBlank()) return
+        if (!spokenMsgIds.add(messageId)) return
         viewModelScope.launch {
             val audio = try {
                 // On-device синтез (sherpa-onnx + Piper); null → fallback на серверный /tts.

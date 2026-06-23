@@ -100,7 +100,9 @@ data class DuqIncomingMessage(
     val content: String,
     // Беседа, к которой относится сообщение (для фильтрации по активному диалогу при
     // переключении). null — старый формат пуша без conversation_id.
-    val conversationId: String? = null
+    val conversationId: String? = null,
+    // Модель решила озвучить (set_response_mode voice) — клиент синтезирует TTS.
+    val voice: Boolean = false
 )
 
 // ── Чат-события / состояние соединения (перенесено из удалённого легаси-слоя) ──
