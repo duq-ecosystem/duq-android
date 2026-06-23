@@ -171,6 +171,7 @@ private fun MainShell(
                 MainScreen(
                     onNavigateToSettings = onNavigateToSettings,
                     onOpenPalette = { showPalette = true },
+                    onOpenDigest = { tabNav.navigate("section/digest") },
                     audioPlaybackManager = audioPlaybackManager
                 )
             }

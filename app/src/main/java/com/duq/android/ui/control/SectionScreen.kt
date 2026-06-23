@@ -35,6 +35,7 @@ fun SectionScreen(sectionKey: String, onBack: () -> Unit, vm: SectionViewModel =
     when (sectionKey) {
         "skills" -> SkillsScreen(onBack)
         "schedule" -> ScheduleScreen(onBack)
+        "digest" -> DigestScreen(onBack)
         else -> EngineScreen(vm, onBack)
     }
 }

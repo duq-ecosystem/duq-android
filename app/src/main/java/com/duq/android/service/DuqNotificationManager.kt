@@ -71,6 +71,8 @@ class DuqNotificationManager @Inject constructor(
                 flags = Intent.FLAG_ACTIVITY_SINGLE_TOP
                 // Пуш «обновление ядра доступно» → тап открывает раздел «Движок» (deep-link).
                 if (type == "core_update") putExtra("open_section", "engine")
+                // Пуш дайджеста → тап открывает раздел 📰 Дайджест (тот же deep-link, что и Движок).
+                if (type == "digest") putExtra("open_section", "digest")
             },
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )

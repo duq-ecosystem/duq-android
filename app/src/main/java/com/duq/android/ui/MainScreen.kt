@@ -88,6 +88,7 @@ import com.duq.android.ui.theme.DuqColors
 fun MainScreen(
     onNavigateToSettings: () -> Unit,
     onOpenPalette: () -> Unit = {},
+    onOpenDigest: () -> Unit = {},
     viewModel: ConversationViewModel = hiltViewModel(),
     audioPlaybackManager: ChatAudioPlaybackManager
 ) {
@@ -110,8 +111,7 @@ fun MainScreen(
     val activeConversationId by viewModel.activeConversationId.collectAsState()
     val activeConversationTitle by viewModel.activeConversationTitle.collectAsState()
     var showInbox by remember { mutableStateOf(false) }
-    var showDigest by remember { mutableStateOf(false) }
-    // Which inbox/digest row is expanded to full text (null = all collapsed).
+    // Which inbox row is expanded to full text (null = all collapsed).
     var expandedItemId by remember { mutableStateOf<Long?>(null) }
 
     // Audio playback state
@@ -338,73 +338,6 @@ fun MainScreen(
         }
     }
 
-    // 📰 Финансовый дайджест — отдельная лента (не в чате). Тап по выпуску
-    // разворачивает ПОЛНЫЙ текст перевода, который можно листать и выделять.
-    if (showDigest) {
-        ModalBottomSheet(
-            onDismissRequest = { showDigest = false },
-            containerColor = DuqColors.surface
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp)
-                    .padding(bottom = 24.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("📰 Дайджест", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = DuqColors.textPrimary)
-                    if (digestItems.isNotEmpty()) {
-                        Text("Очистить", fontSize = 14.sp, color = DuqColors.primary,
-                            modifier = Modifier.clip(RoundedCornerShape(8.dp))
-                                .clickable { viewModel.clearDigest() }.padding(6.dp))
-                    }
-                }
-                if (digestItems.isEmpty()) {
-                    Text("Пока нет выпусков", fontSize = 14.sp, color = DuqColors.textSecondary,
-                        modifier = Modifier.padding(vertical = 16.dp))
-                } else {
-                    androidx.compose.foundation.lazy.LazyColumn(
-                        modifier = Modifier.fillMaxWidth().heightIn(max = 560.dp)
-                    ) {
-                        items(digestItems, key = { it.id }) { item ->
-                            val expanded = expandedItemId == item.id
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 6.dp)
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .background(DuqColors.surfaceVariant)
-                                    .clickable { expandedItemId = if (expanded) null else item.id }
-                                    .padding(12.dp)
-                            ) {
-                                Text(item.title, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = DuqColors.textPrimary)
-                                Text(formatInboxTime(item.timestampMs), fontSize = 11.sp, color = DuqColors.textDim,
-                                    modifier = Modifier.padding(top = 2.dp, bottom = 6.dp))
-                                if (item.text.isNotBlank()) {
-                                    androidx.compose.foundation.text.selection.SelectionContainer {
-                                        Text(
-                                            item.text, fontSize = 14.sp, color = DuqColors.textSecondary,
-                                            lineHeight = 20.sp,
-                                            maxLines = if (expanded) Int.MAX_VALUE else 4,
-                                        )
-                                    }
-                                    if (!expanded) {
-                                        Text("Читать полностью ▾", fontSize = 12.sp, color = DuqColors.primary,
-                                            modifier = Modifier.padding(top = 6.dp))
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
     // Переключатель диалогов — список бесед из /conversations + «Новый чат».
     // (Ядро одноагентное: переключаемся между беседами, а не агентами.)
     if (showConversationPicker) {
@@ -569,7 +502,7 @@ fun MainScreen(
                         .size(44.dp)
                         .clip(CircleShape)
                         .background(DuqColors.surfaceVariant)
-                        .clickable { viewModel.refreshDigest(); showDigest = true },
+                        .clickable(onClick = onOpenDigest),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(Icons.Outlined.Article,
