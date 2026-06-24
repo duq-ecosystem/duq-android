@@ -5,6 +5,7 @@ import android.media.AudioFormat
 import android.media.AudioTrack
 import com.duq.android.logging.Logger
 import com.duq.android.util.ReplyText
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -44,6 +45,10 @@ class StreamingTts @Inject constructor(
     private var channel: Channel<String>? = null
     private var job: Job? = null
 
+    // Текущий трек — поле, чтобы cancel() мог pause() и прервать блокирующий write мгновенно.
+    @Volatile
+    private var track: AudioTrack? = null
+
     fun isStreaming(runId: String): Boolean = activeRunId == runId
 
     /** Старт догона для голосового тёрна. Идемпотентно для того же runId. */
@@ -56,7 +61,6 @@ class StreamingTts @Inject constructor(
         channel = ch
         logger.d(TAG, "start догон runId=${runId.take(8)}")
         job = scope.launch {
-            var track: AudioTrack? = null
             var sampleRate = 0
             var totalFrames = 0
             val replay = mutableListOf<ShortArray>()
@@ -66,19 +70,21 @@ class StreamingTts @Inject constructor(
                     if (text.isBlank()) continue
                     val s = ttsLocal.synthesizeSamples(text)
                     if (s == null) { logger.d(TAG, "seg null (движок не готов) — skip"); continue }
-                    if (track == null) {
+                    val t = track ?: run {
                         sampleRate = s.sampleRate
-                        track = newTrack(sampleRate).apply { play() }
-                        logger.d(TAG, "AudioTrack play sr=$sampleRate")
+                        newTrack(sampleRate).apply { play() }.also { track = it }
+                            .also { logger.d(TAG, "AudioTrack play sr=$sampleRate") }
                     }
                     logger.d(TAG, "seg '${text.take(28)}' samples=${s.pcm.size}")
-                    track.write(s.pcm, 0, s.pcm.size) // блокирует пока буфер занят → льёт потоком
-                    totalFrames += s.pcm.size
+                    // WRITE_BLOCKING явно; проверяем возврат — при ошибке (потеря focus/HAL)
+                    // НЕ увеличиваем totalFrames (иначе drain зависнет), выходим.
+                    val written = t.write(s.pcm, 0, s.pcm.size, AudioTrack.WRITE_BLOCKING)
+                    if (written <= 0) { logger.e(TAG, "AudioTrack.write error=$written — стоп"); break }
+                    totalFrames += written
                     replay.add(s.pcm)
                 }
                 // дать доиграть остаток буфера (write вернулся, но звук ещё проигрывается).
-                // Ограничиваем ожидание длительностью аудио + 1с — защита от вечного цикла,
-                // если playbackHeadPosition застрянет (underrun/несоответствие).
+                // Ограничиваем ожидание длительностью аудио + 1с — защита от вечного цикла.
                 track?.let { t ->
                     val maxWaitMs = totalFrames.toLong() * 1000 / maxOf(1, sampleRate) + 1000
                     var waited = 0L
@@ -89,12 +95,15 @@ class StreamingTts @Inject constructor(
                         delay(50); waited += 50
                     }
                 }
+            } catch (e: CancellationException) {
+                throw e // структурированная отмена + не пишем мусор-кэш отменённого тёрна
             } catch (e: Exception) {
                 logger.e(TAG, "догон stream error: ${e.message}")
             } finally {
                 track?.let { try { it.stop(); it.release() } catch (_: Exception) {} }
+                track = null
             }
-            // единый WAV для replay (мгновенный, с длительностью)
+            // единый WAV для replay (мгновенный, с длительностью) — НЕ выполнится при отмене (CE выше)
             if (replay.isNotEmpty() && sampleRate > 0) playback.cacheStreamedAudio(runId, replay, sampleRate)
             logger.d(TAG, "догон finish runId=${runId.take(8)} chunks=${replay.size} frames=$totalFrames")
         }
@@ -119,10 +128,13 @@ class StreamingTts @Inject constructor(
         channel = null
     }
 
-    /** Прервать догон (новый тёрн/abort/error): отменяем job → finally остановит AudioTrack. */
+    /** Прервать догон (новый тёрн/abort/error): pause трека прерывает блокирующий write
+     *  немедленно (иначе corutine висит в write до ~1с), затем отмена job → finally
+     *  остановит/освободит AudioTrack. */
     fun cancel() {
         activeRunId = null
         channel = null
+        track?.let { try { it.pause() } catch (_: Exception) {} }
         job?.cancel()
         job = null
     }
