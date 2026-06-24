@@ -326,6 +326,20 @@ class ConversationViewModel @Inject constructor(
         refreshUpdateState()
         loadAgents()
         restoreServerHistory()
+        warmTtsModel()
+    }
+
+    /** Прогрев on-device TTS-модели в фоне на старте: к первому голос-ответу модель уже
+     *  скачана → догон стартует и озвучивает ПО ХОДУ генерации (синтез фраз по мере дельт).
+     *  Без прогрева первый голос (модель не готова, isReady=false) уходил в speakReply — тот
+     *  ждал ВЕСЬ текст и синтезировал ЦЕЛИКОМ перед проигрыванием (баг «стрим не работает»).
+     *  Идемпотентно: no-op если модель на месте; ensureModel сам уходит на IO. */
+    private fun warmTtsModel() {
+        if (!com.duq.android.config.AppConfig.TTS_ON_DEVICE) return
+        viewModelScope.launch {
+            runCatching { ttsLocal.ensureModel() }
+                .onFailure { flog.w(TAG, "TTS warm failed: ${it.message}") }
+        }
     }
 
     /** Перечитать список бесед (для переключателя). Тихо игнорит сетевые ошибки. */
