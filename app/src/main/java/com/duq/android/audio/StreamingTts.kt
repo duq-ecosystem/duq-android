@@ -76,12 +76,17 @@ class StreamingTts @Inject constructor(
                     totalFrames += s.pcm.size
                     replay.add(s.pcm)
                 }
-                // дать доиграть остаток буфера (write вернулся, но звук ещё проигрывается)
+                // дать доиграть остаток буфера (write вернулся, но звук ещё проигрывается).
+                // Ограничиваем ожидание длительностью аудио + 1с — защита от вечного цикла,
+                // если playbackHeadPosition застрянет (underrun/несоответствие).
                 track?.let { t ->
-                    while (isActive && t.playState == AudioTrack.PLAYSTATE_PLAYING &&
+                    val maxWaitMs = totalFrames.toLong() * 1000 / maxOf(1, sampleRate) + 1000
+                    var waited = 0L
+                    while (isActive && waited < maxWaitMs &&
+                        t.playState == AudioTrack.PLAYSTATE_PLAYING &&
                         t.playbackHeadPosition < totalFrames
                     ) {
-                        delay(50)
+                        delay(50); waited += 50
                     }
                 }
             } catch (e: Exception) {
