@@ -63,7 +63,9 @@ data class HistoryMsg(
     val id: String? = null,
     val role: String,    // "user" | "assistant"
     val content: String,
-    @SerialName("has_audio") val hasAudio: Boolean = false
+    @SerialName("has_audio") val hasAudio: Boolean = false,
+    // Серверное время создания (Unix-секунды) — канонический порядок сообщений.
+    @SerialName("created_at") val createdAt: Long = 0
 )
 
 /**
@@ -104,7 +106,8 @@ data class OcHistoryMsg(
     val role: String,
     val text: String,
     val id: String? = null,
-    val hasAudio: Boolean = false
+    val hasAudio: Boolean = false,
+    val createdAt: Long = 0        // серверное время (Unix-секунды) — канонический порядок
 )
 
 /** Беседа для переключателя диалогов, render-ready. */

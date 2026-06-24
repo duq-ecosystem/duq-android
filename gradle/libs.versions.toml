@@ -1,9 +1,10 @@
 [versions]
 # Core toolchain
-kotlin = "2.2.20"
+# CMP 1.11.1 iOS/native-артефакты собраны Kotlin 2.3.20 → для iosArm64 нужен 2.3.x (klib ABI).
+kotlin = "2.3.20"
 agp = "8.7.3"
 compose-multiplatform = "1.11.1"
-ksp = "2.2.20-2.0.2"
+ksp = "2.3.20-2.0.4"
 
 # AndroidX / Compose-MP companion libs (JetBrains multiplatform forks)
 androidx-activityCompose = "1.9.3"
