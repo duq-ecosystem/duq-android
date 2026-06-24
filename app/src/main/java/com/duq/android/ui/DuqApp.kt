@@ -197,10 +197,14 @@ private fun MainShell(
                             // чата не повисло поверх Пульта.
                             keyboardController?.hide()
                             focusManager.clearFocus(force = true)
+                            // Тап вкладки ведёт на её корень, СБРАСЫВАЯ деталь-секцию
+                            // (Версия/Скиллы/Задачи), открытую поверх. БЕЗ restoreState —
+                            // он возвращал секцию вместо чистой вкладки (E2E: тап «Чат» из
+                            // «Версии» оставался на «Версии»). Состояние чата сохраняет сам
+                            // NavHost (tab_chat — стартовый, всегда в стеке).
                             tabNav.navigate(tab.route) {
-                                popUpTo(tabNav.graph.findStartDestination().id) { saveState = true }
+                                popUpTo(tabNav.graph.findStartDestination().id) { inclusive = false }
                                 launchSingleTop = true
-                                restoreState = true
                             }
                         },
                         icon = { androidx.compose.material3.Icon(tab.icon, contentDescription = tab.label,
