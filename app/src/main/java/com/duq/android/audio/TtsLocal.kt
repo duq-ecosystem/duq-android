@@ -9,6 +9,7 @@ import com.k2fsa.sherpa.onnx.OfflineTtsConfig
 import com.k2fsa.sherpa.onnx.OfflineTtsModelConfig
 import com.k2fsa.sherpa.onnx.OfflineTtsVitsModelConfig
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlin.concurrent.withLock
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
@@ -41,7 +42,10 @@ class TtsLocal @Inject constructor(
     }
 
     @Volatile private var engine: OfflineTts? = null
-    private val lock = Any()
+    // ReentrantLock (а не synchronized): release() из system memory-callback (Main) должен
+    // НЕ блокироваться, если идёт generate (стриминг зовёт его часто) — иначе ANR. release
+    // использует tryLock. Реентрантен (generate внутри держит лок, ensureEngine — вложенно).
+    private val lock = java.util.concurrent.locks.ReentrantLock()
 
     init {
         // Движок держит модель в RAM; при критической нехватке памяти отдаём её назад
@@ -131,7 +135,7 @@ class TtsLocal @Inject constructor(
     }
 
     private fun ensureEngine(): OfflineTts {
-        synchronized(lock) {
+        lock.withLock {
             engine?.let { return it }
             require(isModelReady()) { "TTS model not ready" }
             val config = OfflineTtsConfig(
@@ -173,7 +177,7 @@ class TtsLocal @Inject constructor(
         if (!isReady() || text.isBlank()) return null
         return try {
             withContext(Dispatchers.Default) {
-                val audio = synchronized(lock) {
+                val audio = lock.withLock {
                     ensureEngine().generate(text, AppConfig.TTS_SPEAKER_ID, AppConfig.TTS_SPEED)
                 }
                 val f = audio.samples
@@ -192,7 +196,7 @@ class TtsLocal @Inject constructor(
     private suspend fun synthesizeWav(text: String, messageId: String): File = withContext(Dispatchers.Default) {
         context.cacheDir.listFiles { f -> f.name.startsWith(TTS_PREFIX) }?.forEach { it.delete() }
         val out = File(context.cacheDir, "$TTS_PREFIX${messageId.take(24)}.wav")
-        val audio = synchronized(lock) {
+        val audio = lock.withLock {
             ensureEngine().generate(text, AppConfig.TTS_SPEAKER_ID, AppConfig.TTS_SPEED)
         }
         // GeneratedAudio.save пишет валидный WAV (PCM16) на нужном sampleRate — тот же формат,
@@ -201,9 +205,15 @@ class TtsLocal @Inject constructor(
         out
     }
 
-    /** Выгружает движок из нативной памяти. Зовётся системой при нехватке RAM. */
+    /** Выгружает движок из нативной памяти. Зовётся системой (Main) при нехватке RAM.
+     *  tryLock — НЕ блокируем Main, если идёт generate (стриминг): пропускаем выгрузку
+     *  (движок освободится на следующем trim/лениво), главное — не висеть на Main → ANR. */
     fun release() {
-        synchronized(lock) { engine?.release(); engine = null }
+        if (lock.tryLock()) {
+            try { engine?.release(); engine = null } finally { lock.unlock() }
+        } else {
+            Log.d(TAG, "release пропущен — идёт синтез")
+        }
     }
 }
 
