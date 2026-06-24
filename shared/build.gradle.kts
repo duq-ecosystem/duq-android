@@ -44,7 +44,10 @@ kotlin {
             implementation(libs.ktor.serialization.json)
             implementation(libs.ktor.client.websockets)
             implementation(libs.ktor.client.logging)
-            // NOTE: navigation/lifecycle/multiplatform-settings/haze — на фазах UI/storage.
+            // Storage (multiplatform-settings 1.2.0) — KMP-хранилище настроек
+            implementation(libs.multiplatform.settings)
+            implementation(libs.multiplatform.settings.coroutines)
+            // NOTE: navigation/lifecycle/haze — на фазах UI.
         }
 
         androidMain.dependencies {
