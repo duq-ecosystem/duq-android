@@ -15,5 +15,6 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "DuqAndroid"
-include(":app")
+rootProject.name = "DuqMobile"
+include(":shared")
+include(":androidApp")

@@ -1,0 +1,75 @@
+name: Android CI
+
+on:
+  push:
+    branches: [ master, main ]
+  pull_request:
+    branches: [ master, main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: recursive   # whisper.cpp (on-device STT) — нужен на фазе audio
+
+    - name: Set up JDK 17
+      uses: actions/setup-java@v4
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+        cache: gradle
+
+    - name: Grant execute permission for gradlew
+      run: chmod +x gradlew
+
+    # versionCode непрерывен с монорепо (последний был 319): run_number нового репо
+    # начинается с 1, сдвигаем на +400 → первый билд > 319, иначе AppUpdater сочтёт даунгрейдом.
+    - name: Compute versionCode (continuous with monorepo 319)
+      run: echo "DUQ_VERSION_CODE=$((GITHUB_RUN_NUMBER + 400))" >> "$GITHUB_ENV"
+
+    - name: Decode keystore
+      if: github.event_name == 'push'
+      run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > androidApp/duq-release.jks
+
+    - name: Build release APK
+      run: ./gradlew :androidApp:assembleRelease --no-daemon --build-cache
+      env:
+        KEYSTORE_FILE: duq-release.jks
+        KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+        KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+        KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        GH_RELEASE_TOKEN: ${{ secrets.GH_RELEASE_TOKEN }}
+        SERVER_TOKEN: ${{ secrets.SERVER_TOKEN }}
+
+    - name: Generate update manifest
+      if: github.event_name == 'push'
+      run: |
+        printf '{"versionCode": %s, "versionName": "1.0.%s"}\n' "$DUQ_VERSION_CODE" "$DUQ_VERSION_CODE" > version.json
+        cat version.json
+
+    - name: Create GitHub Release with APK
+      if: github.event_name == 'push'
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: build-${{ env.DUQ_VERSION_CODE }}
+        name: "Build #${{ env.DUQ_VERSION_CODE }}"
+        body: ${{ github.event.head_commit.message }}
+        files: |
+          androidApp/build/outputs/apk/release/androidApp-release.apk
+          version.json
+        prerelease: false
+        make_latest: true
+
+    - name: Upload APK artifact
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: androidApp-release
+        path: androidApp/build/outputs/apk/release/androidApp-release.apk
+        retention-days: 7
