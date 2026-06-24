@@ -53,26 +53,6 @@ data class MessageEnqueued(
     val status: String
 )
 
-/**
- * Ответ GET /duq/api/task/{task_id}. Поллится до status == "completed"
- * (терминал) либо "failed"/непустой [error]. Пока "running"/"pending" — ждём.
- */
-data class TaskResult(
-    val status: String,
-    val result: TaskResponse? = null,
-    val error: String? = null
-) {
-    val isCompleted: Boolean get() = status.equals("completed", ignoreCase = true)
-    val isFailed: Boolean
-        get() = status.equals("failed", ignoreCase = true) || !error.isNullOrBlank()
-    val isTerminal: Boolean get() = isCompleted || isFailed
-}
-
-/** Полезная нагрузка завершённой задачи. */
-data class TaskResponse(
-    val response: String? = null,
-    val channel: String? = null
-)
 
 /** Один диалог из GET /duq/api/conversations (отсортированы по last_message_at DESC). */
 data class ConversationDto(

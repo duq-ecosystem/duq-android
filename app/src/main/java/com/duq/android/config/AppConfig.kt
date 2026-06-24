@@ -22,11 +22,8 @@ object AppConfig {
     // Новый контракт чата (Ф3a): POST .../message → task_id, GET .../task/{id} poll,
     // GET .../conversations[/{id}/messages] — история. Авторизация edge-токеном.
     const val DUQ_API_BASE_URL = "$BASE_URL/duq/api/"
-    // WS для real-time reasoning-событий (опционально): wss-вариант BASE_URL + /duq/ws.
+    // WS для стрима ответа (TEXT_DELTA/TEXT_DONE) + reasoning-событий: wss BASE_URL + /duq/ws.
     const val DUQ_WS_URL = "wss://on-za-menya.online/duq/ws"
-    // Поллинг задачи: интервал опроса и общий бюджет ожидания ответа ядра.
-    const val DUQ_TASK_POLL_INTERVAL_MS = 1000L
-    const val DUQ_TASK_TIMEOUT_MS = 120_000L
 
     // Log timestamp timezone. The process default resolves to UTC on this device, so
     // FileLogger timestamps were +5h off from Danny's wall clock — pin it explicitly.

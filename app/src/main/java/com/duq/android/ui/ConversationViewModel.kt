@@ -196,11 +196,30 @@ class ConversationViewModel @Inject constructor(
         // Озвучка решения модели — ДО дедупа пузыря: даже если пузырь-дубликат (история/
         // REST), голос озвучить нужно (spokenMsgIds защитит от повторного синтеза).
         if (msg.voice && role == MessageRole.ASSISTANT) speakReply(msg.messageId, msg.content)
-        if (isRecentDuplicate(role, msg.content)) return  // своё/REST/история — не дублируем
+        if (isRecentDuplicate(role, msg.content)) {
+            // Пузырь уже отрисован стримом (TEXT_DONE финализировал) — этот chat.message
+            // несёт СЕРВЕРНЫЙ id + has_audio. Реконсилим: пузырь усыновляет серверный id
+            // (ключ кэша озвучки = как в истории) и hasAudio (кнопка play появляется live).
+            if (role == MessageRole.ASSISTANT) reconcileServerMessage(msg)
+            return
+        }
         // hasAudio=msg.voice СРАЗУ — кнопка play на озвученном ответе появляется без задержки
         // (раньше ставилась постфактум в speakReply после синтеза; если беседа перезагружалась
         // из REST до конца синтеза — обновление терялось до следующей перезагрузки).
         _messages.update { it + Message(id = msg.messageId, role = role, content = msg.content, hasAudio = msg.voice) }
+    }
+
+    /** chat.message-дубль уже отрисованного стрим-пузыря → усыновить серверный id (ключ
+     *  кэша озвучки/replay, как в истории) и has_audio (кнопка play появляется live). */
+    private fun reconcileServerMessage(msg: DuqIncomingMessage) {
+        val norm = msg.content.trim()
+        _messages.update { list ->
+            val idx = list.indexOfLast { it.role == MessageRole.ASSISTANT && it.content.trim() == norm }
+            if (idx < 0) list
+            else list.mapIndexed { i, m ->
+                if (i == idx) m.copy(id = msg.messageId, hasAudio = m.hasAudio || msg.voice) else m
+            }
+        }
     }
 
     private val flog = com.duq.android.logging.FileLogger(context)

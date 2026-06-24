@@ -118,20 +118,39 @@ class DuqChatClient @Inject constructor(
         currentRunId = runId
         scope.launch {
             try {
-                val taskId = rest.sendMessage(text, conversationId, newConversation, agentId)
-                val answer = rest.awaitResponse(taskId)
-                _chatEvents.emit(
-                    OcChatEvent(runId = runId, state = "final", fullText = answer)
-                )
+                // ТОЛЬКО ставим задачу в очередь. Ответ приходит СТРИМОМ по /ws:
+                // TEXT_DELTA (рендер на лету) → onStreamDelta, TEXT_DONE → onStreamDone
+                // (финал). REST-поллинг (rest.awaitResponse) ВЫРЕЗАН — больше не ждём
+                // целый ответ опросом, токены летят сразу. Нет ответа за окно → watchdog
+                // в ConversationViewModel покажет таймаут.
+                rest.sendMessage(text, conversationId, newConversation, agentId)
             } catch (e: Exception) {
                 logger.e(TAG, "sendMessage failed: ${e.message}")
                 _chatEvents.emit(
                     OcChatEvent(runId = runId, state = "error", errorMessage = e.message ?: "Send failed")
                 )
-            } finally {
                 if (currentRunId == runId) currentRunId = null
             }
         }
+    }
+
+    /** TEXT_DELTA — кумулятивный текст ответа на лету. Биндим к in-flight тёрну (currentRunId). */
+    fun onStreamDelta(cumulative: String) {
+        val rid = currentRunId ?: return
+        scope.launch { _chatEvents.emit(OcChatEvent(runId = rid, state = "delta", fullText = cumulative)) }
+    }
+
+    /** TEXT_DONE — финал стрима: финализируем пузырь (как прежний REST-final), тёрн завершён. */
+    fun onStreamDone(cumulative: String) {
+        val rid = currentRunId ?: return
+        currentRunId = null
+        scope.launch { _chatEvents.emit(OcChatEvent(runId = rid, state = "final", fullText = cumulative)) }
+    }
+
+    /** TEXT_RESET — стримленный «текст» оказался tool-call'ом (llama-recovery) → чистим частичный пузырь. */
+    fun onStreamReset() {
+        val rid = currentRunId ?: return
+        scope.launch { _chatEvents.emit(OcChatEvent(runId = rid, state = "delta", fullText = "")) }
     }
 
     /** Реестр агентов ядра (профили тулсета) для пикера. */

@@ -7,7 +7,6 @@ import com.duq.android.network.withServerAuth
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -19,8 +18,8 @@ import javax.inject.Singleton
 
 /**
  * REST-клиент нового ядра DUQ (duq-core за nginx, база [AppConfig.DUQ_API_BASE_URL]).
- * Чат-цикл: enqueue ([sendMessage]) → poll ([pollTask]) → итоговый ответ
- * ([awaitResponse]). История — [conversations]/[messages].
+ * Чат: enqueue ([sendMessage]) → ответ приходит СТРИМОМ по /ws (TEXT_DELTA/TEXT_DONE),
+ * REST-поллинг вырезан. История — [conversations]/[messages].
  *
  * Все запросы несут edge-токен (X-Auth-Token) через [withServerAuth]. Сетевые вызовы
  * выполняются на [Dispatchers.IO]; HTTP-клиент шарит пул соединений (один на инстанс).
@@ -83,38 +82,9 @@ class DuqRestClient @Inject constructor(
         }
     }
 
-    /** Один опрос состояния задачи. */
-    suspend fun pollTask(taskId: String): TaskResult = withContext(Dispatchers.IO) {
-        val req = Request.Builder().url(url("task/$taskId")).withServerAuth().get().build()
-        httpClient.newCall(req).execute().use { resp ->
-            val raw = resp.body?.string().orEmpty()
-            if (!resp.isSuccessful) throw DuqApiException("task ${resp.code}: ${raw.take(200)}")
-            gson.fromJson(raw, TaskResult::class.java)
-                ?: throw DuqApiException("task: empty body")
-        }
-    }
-
-    /**
-     * Поллит задачу до терминального состояния и возвращает текст ответа.
-     * Голос (решение модели) едет отдельно — в live chat.message, не в task.result.
-     * Бросает [DuqApiException] на failed/таймауте.
-     */
-    suspend fun awaitResponse(
-        taskId: String,
-        timeoutMs: Long = AppConfig.DUQ_TASK_TIMEOUT_MS,
-        intervalMs: Long = AppConfig.DUQ_TASK_POLL_INTERVAL_MS
-    ): String {
-        val deadline = System.currentTimeMillis() + timeoutMs
-        while (System.currentTimeMillis() < deadline) {
-            val result = pollTask(taskId)
-            when {
-                result.isCompleted -> return result.result?.response.orEmpty()
-                result.isFailed -> throw DuqApiException("task failed: ${result.error ?: result.status}")
-                else -> delay(intervalMs)
-            }
-        }
-        throw DuqApiException("task $taskId: timeout after ${timeoutMs}ms")
-    }
+    // pollTask/awaitResponse ВЫРЕЗАНЫ: ответ теперь приходит СТРИМОМ по /ws (TEXT_DELTA/
+    // TEXT_DONE → DuqChatClient.onStreamDelta/onStreamDone), REST-поллинг /api/task больше
+    // не нужен. /api/message только ставит задачу в очередь.
 
     /** Список диалогов пользователя. */
     suspend fun conversations(agentId: String? = null): List<ConversationDto> = withContext(Dispatchers.IO) {
@@ -138,7 +108,6 @@ class DuqRestClient @Inject constructor(
         }
     }
 
-    /** Доступные тулы (имена) — для назначения тулсета агенту в панели. */
     /** Тулы, сгруппированные ядром по категориям — для свёрнутого тулсета агента. */
     suspend fun listToolCategories(): List<ToolCategory> = withContext(Dispatchers.IO) {
         val req = Request.Builder().url(url("tools")).withServerAuth().get().build()

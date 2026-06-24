@@ -125,12 +125,25 @@ class DuqNodeClient @Inject constructor(
             "phone.command" -> handleCommand(frame)
             "chat.message" -> handleChatMessage(frame)
             else -> {
-                // reasoning-события ядра несут "event_type" (REASONING_*), не "type" —
-                // прокидываем в чат как live-шаги агента (что вызывает и в каком порядке).
-                val et = frame["event_type"] as? String
-                if (et != null && et.startsWith("REASONING_")) handleReasoning(et, frame)
+                // События ядра несут "event_type" (не "type"). REASONING_* → live-шаги
+                // агента; TEXT_* → стрим текста ответа (рендер на лету вместо REST-поллинга).
+                val et = frame["event_type"] as? String ?: return
+                when {
+                    et.startsWith("REASONING_") -> handleReasoning(et, frame)
+                    et == "TEXT_DELTA" -> handleTextStream(frame, done = false)
+                    et == "TEXT_DONE" -> handleTextStream(frame, done = true)
+                    et == "TEXT_RESET" -> chatClient.onStreamReset()
+                }
             }
         }
+    }
+
+    /** TEXT_DELTA/TEXT_DONE → стрим текста ответа (data.message = КУМУЛЯТИВНЫЙ текст). */
+    private fun handleTextStream(frame: Map<String, Any?>, done: Boolean) {
+        @Suppress("UNCHECKED_CAST")
+        val data = (frame["data"] as? Map<String, Any?>) ?: emptyMap()
+        val cumulative = data["message"] as? String ?: return
+        if (done) chatClient.onStreamDone(cumulative) else chatClient.onStreamDelta(cumulative)
     }
 
     /** REASONING_* фрейм → шаг агента в текущем тёрне (через DuqChatClient). */
