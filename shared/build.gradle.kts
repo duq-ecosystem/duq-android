@@ -59,8 +59,12 @@ kotlin {
             implementation(libs.kotlinx.coroutines.android)
             implementation(libs.koin.android)
             implementation(libs.ktor.client.okhttp)
-            // NOTE: media3, sherpa-onnx, silero-vad, camerax, play-location, work, security —
-            // на фазе audio/platform (expect/actual).
+            // Audio (Android actual): плеер, on-device TTS/VAD, распаковка модели
+            implementation(libs.androidx.media3.exoplayer)
+            implementation(libs.sherpa.onnx)
+            implementation(libs.silero.vad)
+            implementation(libs.commons.compress)
+            // NOTE: camerax, play-location, work, security — на фазе platform (location/camera/updater).
         }
 
         iosMain.dependencies {
