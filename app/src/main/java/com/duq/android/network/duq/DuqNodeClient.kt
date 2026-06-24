@@ -143,9 +143,8 @@ class DuqNodeClient @Inject constructor(
         @Suppress("UNCHECKED_CAST")
         val data = (frame["data"] as? Map<String, Any?>) ?: emptyMap()
         val cumulative = data["message"] as? String ?: return
-        val voice = data["voice"] as? Boolean ?: false
-        logger.d(TAG, "TEXT_${if (done) "DONE" else "DELTA"} len=${cumulative.length} voice=$voice")
-        if (done) chatClient.onStreamDone(cumulative, voice) else chatClient.onStreamDelta(cumulative, voice)
+        logger.d(TAG, "TEXT_${if (done) "DONE" else "DELTA"} len=${cumulative.length}")
+        if (done) chatClient.onStreamDone(cumulative) else chatClient.onStreamDelta(cumulative)
     }
 
     /** REASONING_* фрейм → шаг агента в текущем тёрне (через DuqChatClient). */

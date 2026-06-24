@@ -138,16 +138,16 @@ class DuqChatClient @Inject constructor(
      *  app-sent currentRunId уже задан в sendMessage; для server-sent (проактив/REST из
      *  другого источника/мой curl-тест) currentRunId нет → заводим стрим-runId на первой
      *  дельте (один на весь ответ), чтобы пузырь рос и для таких сообщений тоже. */
-    fun onStreamDelta(cumulative: String, voice: Boolean = false) {
+    fun onStreamDelta(cumulative: String) {
         val rid = currentRunId ?: java.util.UUID.randomUUID().toString().also { currentRunId = it }
-        scope.launch { _chatEvents.emit(OcChatEvent(runId = rid, state = "delta", fullText = cumulative, voice = voice)) }
+        scope.launch { _chatEvents.emit(OcChatEvent(runId = rid, state = "delta", fullText = cumulative)) }
     }
 
     /** TEXT_DONE — финал стрима: финализируем пузырь (как прежний REST-final), тёрн завершён. */
-    fun onStreamDone(cumulative: String, voice: Boolean = false) {
+    fun onStreamDone(cumulative: String) {
         val rid = currentRunId ?: return
         currentRunId = null
-        scope.launch { _chatEvents.emit(OcChatEvent(runId = rid, state = "final", fullText = cumulative, voice = voice)) }
+        scope.launch { _chatEvents.emit(OcChatEvent(runId = rid, state = "final", fullText = cumulative)) }
     }
 
     /** TEXT_RESET — стримленный «текст» оказался tool-call'ом (llama-recovery) → чистим частичный пузырь. */
