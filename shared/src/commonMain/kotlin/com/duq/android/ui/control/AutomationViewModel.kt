@@ -79,5 +79,5 @@ class AutomationViewModel(
     fun deleteTask(taskId: String) = mutate { rest.deleteCronTask(taskId) }
 
     /** Вкл/выкл крон-задачи (pause/resume). Включаемый именно КРОН, не скилл. */
-    fun toggleTask(t: CronTaskDto) = mutate { rest.setCronEnabled(t.task_id, !t.enabled) }
+    fun toggleTask(t: CronTaskDto) = mutate { rest.setCronEnabled(t.taskId, !t.enabled) }
 }
