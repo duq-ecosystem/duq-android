@@ -98,7 +98,7 @@ fun MessagesList(
                     val progress = if (isCurrentlyPlaying) audioPlaybackInfo.progress else 0f
                     // Длительность — живая из PlaybackInfo (Message.audioDurationMs не заполняется).
                     val durationMs = if (isCurrentlyPlaying && audioPlaybackInfo.durationMs > 0)
-                        audioPlaybackInfo.durationMs.toInt() else null
+                        audioPlaybackInfo.durationMs.coerceAtMost(Int.MAX_VALUE.toLong()).toInt() else null
 
                     MessageBubble(
                         message = message,

@@ -489,8 +489,12 @@ class ChatAudioPlaybackManager @Inject constructor(
         if (oldId == newId) return
         val old = getCachedAudioFile(oldId)
         if (!old.exists()) return
+        val dest = getCachedAudioFile(newId)
+        // renameTo — атомарный syscall на том же volume (cacheDir), без побайтовой копии
+        // (она блокировала бы Main → ANR). Fallback на copy только при cross-volume (редко).
+        if (old.renameTo(dest)) return
         try {
-            old.copyTo(getCachedAudioFile(newId), overwrite = true)
+            old.copyTo(dest, overwrite = true)
             old.delete()
         } catch (e: Exception) {
             Log.w(TAG, "renameCache failed: ${e.message}")
@@ -509,10 +513,20 @@ class ChatAudioPlaybackManager @Inject constructor(
             try {
                 val datas = segments.filter { it.exists() && it.length() > 44L }.map { it.readBytes() }
                 if (datas.isEmpty()) return@launch
-                val pcmTotal = datas.sumOf { it.size - 44 }
+                // Склейка валидна ТОЛЬКО при едином формате сегментов. При fallback часть фраз
+                // может прийти с сервера (Silero, другой sampleRate) — склеив их со sherpa-
+                // заголовком, получим неверный темп. Сверяем fmt (bytes 22..35: channels/
+                // sampleRate/byteRate/blockAlign/bits); при расхождении НЕ клеим (replay
+                // ре-синтезирует корректно цельным текстом).
+                val fmt0 = datas[0].copyOfRange(22, 36)
+                if (datas.any { !it.copyOfRange(22, 36).contentEquals(fmt0) }) {
+                    Log.w(TAG, "cacheConcatenated: разный формат сегментов — пропуск склейки")
+                    return@launch
+                }
+                val pcmTotal = datas.sumOf { (it.size - 44).toLong() }  // Long: без переполнения Int
                 val header = datas[0].copyOfRange(0, 44)
-                writeLe32(header, 4, 36 + pcmTotal)   // RIFF chunk size
-                writeLe32(header, 40, pcmTotal)        // data subchunk size
+                writeLe32(header, 4, 36L + pcmTotal)   // RIFF chunk size (UINT32)
+                writeLe32(header, 40, pcmTotal)         // data subchunk size (UINT32)
                 getCachedAudioFile(messageId).outputStream().use { os ->
                     os.write(header)
                     for (d in datas) os.write(d, 44, d.size - 44)
@@ -523,7 +537,8 @@ class ChatAudioPlaybackManager @Inject constructor(
         }
     }
 
-    private fun writeLe32(b: ByteArray, off: Int, v: Int) {
+    /** Записать UINT32 little-endian (WAV-поля размера ограничены 4 GB → Long маскируем). */
+    private fun writeLe32(b: ByteArray, off: Int, v: Long) {
         b[off] = (v and 0xFF).toByte()
         b[off + 1] = ((v shr 8) and 0xFF).toByte()
         b[off + 2] = ((v shr 16) and 0xFF).toByte()

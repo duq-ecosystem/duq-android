@@ -216,17 +216,16 @@ class ConversationViewModel @Inject constructor(
      *  кэша озвучки/replay, как в истории) и has_audio (кнопка play появляется live). */
     private fun reconcileServerMessage(msg: DuqIncomingMessage) {
         val norm = msg.content.trim()
+        // Пузырь меняет runId → серверный id: переносим кэш озвучки (иначе replay по серверному
+        // id не найдёт синтез, был под runId, и ре-синтезирует). renameCache — ДО update и вне
+        // его лямбды (renameTo атомарен, но файловый IO в update-лямбде на Main — анти-паттерн).
+        val oldId = _messages.value.lastOrNull { it.role == MessageRole.ASSISTANT && it.content.trim() == norm }?.id
+        if (oldId != null && oldId != msg.messageId) audioPlaybackManager.renameCache(oldId, msg.messageId)
         _messages.update { list ->
             val idx = list.indexOfLast { it.role == MessageRole.ASSISTANT && it.content.trim() == norm }
             if (idx < 0) list
-            else {
-                // Пузырь меняет runId → серверный id: переносим кэш озвучки, иначе replay
-                // по серверному id не найдёт синтез (был под runId) и ре-синтезирует.
-                val old = list[idx]
-                if (old.id != msg.messageId) audioPlaybackManager.renameCache(old.id, msg.messageId)
-                list.mapIndexed { i, m ->
-                    if (i == idx) m.copy(id = msg.messageId, hasAudio = m.hasAudio || msg.voice) else m
-                }
+            else list.mapIndexed { i, m ->
+                if (i == idx) m.copy(id = msg.messageId, hasAudio = m.hasAudio || msg.voice) else m
             }
         }
     }
