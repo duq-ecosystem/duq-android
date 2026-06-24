@@ -252,7 +252,14 @@ class ConversationViewModel @Inject constructor(
     fun loadAgents() {
         viewModelScope.launch {
             runCatching { gatewayClient.listAgents() }
-                .onSuccess { _agents.value = it }
+                .onSuccess { agents ->
+                    _agents.value = agents
+                    // Активный агент исчез из списка (удалён на сервере) → сброс на main.
+                    // Иначе чат висит на несуществующем агенте: «агента нет, а чат есть».
+                    if (agents.isNotEmpty() && agents.none { it.id == _activeAgentId.value }) {
+                        switchAgent("main")
+                    }
+                }
                 .onFailure { Log.w(TAG, "loadAgents failed: ${it.message}") }
         }
     }
