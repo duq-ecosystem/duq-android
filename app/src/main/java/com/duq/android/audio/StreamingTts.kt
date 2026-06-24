@@ -1,7 +1,9 @@
 package com.duq.android.audio
 
+import android.media.AudioAttributes
+import android.media.AudioFormat
+import android.media.AudioTrack
 import com.duq.android.logging.Logger
-import com.duq.android.network.TtsClient
 import com.duq.android.util.ReplyText
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -9,42 +11,39 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Инкрементальный TTS («догон» озвучки): синтезирует ответ ПО ФРАЗАМ по мере прихода
- * стрим-дельт текста и проигрывает сегменты по порядку — озвучка стартует с первого
- * готового предложения, не дожидаясь всего текста ответа.
+ * НОРМАЛЬНЫЙ потоковый TTS-догон: по мере стрима текста (дельт) синтезируем завершённые
+ * фразы on-device (sherpa-onnx → PCM-сэмплы) и пишем их в ОДИН непрерывный [AudioTrack]
+ * по мере готовности. Звук льётся сразу с первой фразы — без WAV-файлов на фразу, без
+ * очереди в ExoPlayer, без склейки (всё это были костыли).
  *
- * SRP: ConversationViewModel зовёт [start] (начало голосового тёрна) → [feed] (на каждую
- * дельту) → [finish] (финал), либо [cancel] (abort/новый тёрн). Синтез строго
- * последовательный (single-consumer Channel) → порядок сегментов сохраняется. Сегментер
- * работает на СЫРОМ кумулятиве (стабильный растущий префикс), markdown чистится у каждой
- * выделенной фразы перед синтезом. Backend синтеза — on-device [TtsLocal] с fallback на
- * серверный [TtsClient] (тот же путь, что и разовый speakReply).
+ * Только on-device (sherpa, единый формат). Если движок ещё не готов (модель не скачана) —
+ * догон не стартует (ConversationViewModel.isReady-гейт), обычный speakReply озвучит и
+ * скачает. PCM накапливаем → один WAV в кэш для мгновенного replay.
+ *
+ * VM зовёт start (начало голосового тёрна) → feed (на каждую дельту) → finish (финал),
+ * либо cancel (abort/новый тёрн).
  */
 @Singleton
 class StreamingTts @Inject constructor(
     private val ttsLocal: TtsLocal,
-    private val ttsClient: TtsClient,
     private val playback: ChatAudioPlaybackManager,
     private val logger: Logger,
 ) {
-    // scope на Main: ВСЕ поля (channel/job/segIdx/activeRunId) и сегментер трогаются только
-    // из Main (VM-вызовы + consumer на Main) → без гонок. Сам синтез тяжёлый уходит в IO
-    // внутри ttsLocal.trySynthesize / ttsClient.synthesize (suspend с withContext(IO)),
-    // поэтому Main не блокируется (consumer на нём только ждёт).
-    private val scope = CoroutineScope(Dispatchers.Main.immediate + SupervisorJob())
+    private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val segmenter = SentenceStreamer()
 
+    @Volatile
     private var activeRunId: String? = null
     private var channel: Channel<String>? = null
     private var job: Job? = null
-    private var segIdx = 0
 
-    /** Идёт ли догон для данного тёрна (VM решает: финалить инкрементально или speakReply). */
     fun isStreaming(runId: String): Boolean = activeRunId == runId
 
     /** Старт догона для голосового тёрна. Идемпотентно для того же runId. */
@@ -53,57 +52,98 @@ class StreamingTts @Inject constructor(
         cancel()
         activeRunId = runId
         segmenter.reset()
-        segIdx = 0
         val ch = Channel<String>(Channel.UNLIMITED)
         channel = ch
+        logger.d(TAG, "start догон runId=${runId.take(8)}")
         job = scope.launch {
-            val segs = mutableListOf<java.io.File>()
-            for (rawSentence in ch) {
-                val text = ReplyText.clean(rawSentence)
-                if (text.isBlank()) continue
-                val id = "${runId}_seg${segIdx++}"
-                val file = try {
-                    ttsLocal.trySynthesize(text, id) ?: ttsClient.synthesize(text, id)
-                } catch (e: Exception) {
-                    logger.e(TAG, "segment synth failed: ${e.message}"); null
+            var track: AudioTrack? = null
+            var sampleRate = 0
+            var totalFrames = 0
+            val replay = mutableListOf<ShortArray>()
+            try {
+                for (raw in ch) {
+                    val text = ReplyText.clean(raw)
+                    if (text.isBlank()) continue
+                    val s = ttsLocal.synthesizeSamples(text)
+                    if (s == null) { logger.d(TAG, "seg null (движок не готов) — skip"); continue }
+                    if (track == null) {
+                        sampleRate = s.sampleRate
+                        track = newTrack(sampleRate).apply { play() }
+                        logger.d(TAG, "AudioTrack play sr=$sampleRate")
+                    }
+                    logger.d(TAG, "seg '${text.take(28)}' samples=${s.pcm.size}")
+                    track.write(s.pcm, 0, s.pcm.size) // блокирует пока буфер занят → льёт потоком
+                    totalFrames += s.pcm.size
+                    replay.add(s.pcm)
                 }
-                if (file != null) { playback.enqueueSegment(runId, file); segs.add(file) }
+                // дать доиграть остаток буфера (write вернулся, но звук ещё проигрывается)
+                track?.let { t ->
+                    while (isActive && t.playState == AudioTrack.PLAYSTATE_PLAYING &&
+                        t.playbackHeadPosition < totalFrames
+                    ) {
+                        delay(50)
+                    }
+                }
+            } catch (e: Exception) {
+                logger.e(TAG, "догон stream error: ${e.message}")
+            } finally {
+                track?.let { try { it.stop(); it.release() } catch (_: Exception) {} }
             }
-            playback.finishStream(runId)
-            playback.cacheConcatenated(runId, segs) // единый файл → replay мгновенный + длительность
+            // единый WAV для replay (мгновенный, с длительностью)
+            if (replay.isNotEmpty() && sampleRate > 0) playback.cacheStreamedAudio(runId, replay, sampleRate)
+            logger.d(TAG, "догон finish runId=${runId.take(8)} chunks=${replay.size} frames=$totalFrames")
         }
     }
 
     /** Скормить кумулятивный (СЫРОЙ) текст дельты: новые завершённые фразы → в синтез. */
     fun feed(runId: String, cumulativeRaw: String) {
         if (activeRunId != runId) return
-        segmenter.newSentences(cumulativeRaw).forEach { channel?.trySend(it) }
+        val sents = segmenter.newSentences(cumulativeRaw)
+        if (sents.isNotEmpty()) logger.d(TAG, "feed +${sents.size} фраз")
+        sents.forEach { channel?.trySend(it) }
     }
 
-    /** Финал: остаток текста → в синтез, закрыть канал (consumer доиграет и finishStream). */
+    /** Финал: остаток текста → в синтез, закрыть канал (consumer доиграет и кэширует replay). */
     fun finish(runId: String, fullTextRaw: String) {
         if (activeRunId != runId) return
-        segmenter.flush(fullTextRaw)?.let { channel?.trySend(it) }
+        val tail = segmenter.flush(fullTextRaw)
+        logger.d(TAG, "finish runId=${runId.take(8)} tail='${tail?.take(28)}'")
+        tail?.let { channel?.trySend(it) }
         channel?.close()
         activeRunId = null
         channel = null
     }
 
-    /** Прервать догон (новый тёрн/abort/error): стоп синтеза и озвучки.
-     *  Канал НЕ закрываем — отменяем job (consumer прервётся CancellationException,
-     *  finishStream НЕ вызовется, в отличие от штатного [finish]). */
+    /** Прервать догон (новый тёрн/abort/error): отменяем job → finally остановит AudioTrack. */
     fun cancel() {
         activeRunId = null
         channel = null
         job?.cancel()
         job = null
-        playback.cancelStream()
     }
 
-    /** Освободить scope (вызывать из того же места, что и ChatAudioPlaybackManager.release). */
-    fun release() {
-        scope.cancel()
-        playback.cancelStream()
+    private fun newTrack(sampleRate: Int): AudioTrack {
+        val minBuf = AudioTrack.getMinBufferSize(
+            sampleRate, AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_16BIT
+        )
+        val bufBytes = maxOf(minBuf, sampleRate * 2) // ~1с буфер (sampleRate сэмплов × 2 байта)
+        return AudioTrack.Builder()
+            .setAudioAttributes(
+                AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_MEDIA)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                    .build()
+            )
+            .setAudioFormat(
+                AudioFormat.Builder()
+                    .setSampleRate(sampleRate)
+                    .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
+                    .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
+                    .build()
+            )
+            .setBufferSizeInBytes(bufBytes)
+            .setTransferMode(AudioTrack.MODE_STREAM)
+            .build()
     }
 
     companion object {

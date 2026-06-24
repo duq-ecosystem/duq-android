@@ -5,6 +5,7 @@ import android.net.Uri
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import com.duq.android.logging.Logger
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
@@ -50,7 +51,8 @@ data class PlaybackInfo(
  */
 @Singleton
 class ChatAudioPlaybackManager @Inject constructor(
-    @ApplicationContext private val context: Context
+    @ApplicationContext private val context: Context,
+    private val flog: Logger,
 ) {
     companion object {
         private const val TAG = "ChatAudioPlayback"
@@ -85,13 +87,6 @@ class ChatAudioPlaybackManager @Inject constructor(
     // Playback state exposed to UI
     private val _playbackInfo = MutableStateFlow(PlaybackInfo())
     val playbackInfo: StateFlow<PlaybackInfo> = _playbackInfo.asStateFlow()
-
-    // --- Стрим-TTS: очередь сегментов-фраз (догон озвучки по мере стрима текста) ---
-    // Доступ только из main thread (через mainHandler) — без доп. синхронизации.
-    private val segmentQueue = ArrayDeque<File>()
-    @Volatile
-    private var streamingMsgId: String? = null
-    private var playingSegment = false
 
     /**
      * Initialize the player (call on app start)
@@ -158,72 +153,54 @@ class ChatAudioPlaybackManager @Inject constructor(
     }
 
     /**
-     * Стрим-TTS: добавить синтезированный сегмент-фразу в очередь воспроизведения.
-     * Первый сегмент стартует сессию (keyed by messageId), последующие доигрываются
-     * по порядку. Для «догона» озвучки по мере стрима текста ответа.
+     * Записать накопленные PCM16-сэмменты потокового догона ОДНИМ WAV в кэш под [messageId] —
+     * для мгновенного replay и длительности (сам догон льёт звук в AudioTrack, файла не
+     * оставляет). Заголовок WAV (44 байта) + сырой PCM. На Dispatchers.IO.
      */
-    fun enqueueSegment(messageId: String, audioFile: File) {
-        if (isReleased || !audioFile.exists()) return
-        mainHandler.post {
-            if (isReleased) return@post
-            if (streamingMsgId != messageId) { // новая стрим-сессия
-                stopInternal() // снимает прошлый listener, чистит очередь
-                streamingMsgId = messageId
-                // Listener ставим ОДИН раз на сессию (не на каждый сегмент) — иначе гонка
-                // remove/add вокруг setMediaItem может потерять или продублировать STATE_ENDED.
-                val player = exoPlayer ?: ExoPlayer.Builder(context).build().also { exoPlayer = it }
-                val listener = object : Player.Listener {
-                    override fun onPlaybackStateChanged(state: Int) {
-                        if (state == Player.STATE_ENDED) playNextSegment()
-                    }
-                    override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
-                        Log.e(TAG, "segment playback error: ${error.message}")
-                        playNextSegment() // не застреваем — следующий сегмент
+    fun cacheStreamedAudio(messageId: String, pcmChunks: List<ShortArray>, sampleRate: Int) {
+        if (isReleased || pcmChunks.isEmpty()) return
+        scope.launch(Dispatchers.IO) {
+            try {
+                val totalSamples = pcmChunks.sumOf { it.size.toLong() }
+                val dataBytes = totalSamples * 2 // PCM16
+                getCachedAudioFile(messageId).outputStream().buffered().use { os ->
+                    os.write(wavHeader(dataBytes, sampleRate))
+                    for (chunk in pcmChunks) {
+                        val bytes = ByteArray(chunk.size * 2)
+                        var j = 0
+                        for (s in chunk) {
+                            bytes[j++] = (s.toInt() and 0xFF).toByte()
+                            bytes[j++] = ((s.toInt() shr 8) and 0xFF).toByte()
+                        }
+                        os.write(bytes)
                     }
                 }
-                currentListener = listener
-                player.addListener(listener)
-                _playbackInfo.value = PlaybackInfo(messageId = messageId, state = PlaybackState.PLAYING)
+            } catch (e: Exception) {
+                flog.w(TAG, "cacheStreamedAudio failed: ${e.message}")
             }
-            segmentQueue.addLast(audioFile)
-            if (!playingSegment) playNextSegment()
         }
     }
 
-    /** Проиграть следующий сегмент из очереди (main thread). Listener сессии уже стоит. */
-    private fun playNextSegment() {
-        if (isReleased) return
-        val file = segmentQueue.removeFirstOrNull() ?: run {
-            playingSegment = false
-            // Очередь пуста: стрим завершён → сброс; иначе ждём следующий сегмент.
-            if (streamingMsgId == null) _playbackInfo.value = PlaybackInfo()
-            return
-        }
-        playingSegment = true
-        val player = exoPlayer ?: run { playingSegment = false; return }
-        try {
-            player.clearMediaItems() // прошлый item (его STATE_ENDED уже обработан) → IDLE
-            player.setMediaItem(MediaItem.fromUri(Uri.fromFile(file)))
-            player.prepare()
-            player.play()
-        } catch (e: Exception) {
-            Log.e(TAG, "playNextSegment failed: ${e.message}")
-            playingSegment = false
-        }
-    }
-
-    /** Стрим завершён: новых сегментов не будет. Когда очередь доиграет — сброс в IDLE. */
-    fun finishStream(messageId: String) {
-        mainHandler.post {
-            if (streamingMsgId != messageId) return@post
-            streamingMsgId = null
-            if (!playingSegment && segmentQueue.isEmpty()) _playbackInfo.value = PlaybackInfo()
-        }
-    }
-
-    /** Прервать стрим-озвучку (новый тёрн/abort): стоп + очистка очереди. */
-    fun cancelStream() {
-        mainHandler.post { stopInternal() }
+    /** Стандартный 44-байтный WAV-заголовок (PCM16, моно) для [dataBytes] аудио-данных. */
+    private fun wavHeader(dataBytes: Long, sampleRate: Int): ByteArray {
+        val h = ByteArray(44)
+        val byteRate = sampleRate * 2 // mono * 16bit
+        fun le32(off: Int, v: Long) { for (i in 0..3) h[off + i] = ((v shr (8 * i)) and 0xFF).toByte() }
+        fun le16(off: Int, v: Int) { h[off] = (v and 0xFF).toByte(); h[off + 1] = ((v shr 8) and 0xFF).toByte() }
+        "RIFF".toByteArray().copyInto(h, 0)
+        le32(4, 36 + dataBytes)
+        "WAVE".toByteArray().copyInto(h, 8)
+        "fmt ".toByteArray().copyInto(h, 12)
+        le32(16, 16)          // PCM fmt chunk size
+        le16(20, 1)           // PCM
+        le16(22, 1)           // mono
+        le32(24, sampleRate.toLong())
+        le32(28, byteRate.toLong())
+        le16(32, 2)           // block align (mono*16bit/8)
+        le16(34, 16)          // bits per sample
+        "data".toByteArray().copyInto(h, 36)
+        le32(40, dataBytes)
+        return h
     }
 
     /**
@@ -367,12 +344,9 @@ class ChatAudioPlaybackManager @Inject constructor(
         mainHandler.post { stopInternal() }
     }
 
-    /** Останов + сброс (main thread). Чистит и стрим-очередь сегментов. */
+    /** Останов + сброс (main thread). */
     private fun stopInternal() {
         stopProgressUpdates()
-        streamingMsgId = null
-        segmentQueue.clear()
-        playingSegment = false
         currentListener?.let { l -> exoPlayer?.removeListener(l) }
         currentListener = null
         exoPlayer?.stop()
@@ -501,47 +475,4 @@ class ChatAudioPlaybackManager @Inject constructor(
         }
     }
 
-    /**
-     * Склеить WAV-сегменты догона в ОДИН файл кэша (replay + длительность). Догон играет
-     * пофразно и единого файла не оставляет → replay ре-синтезировал бы (долго) и
-     * длительности не было бы. Сегменты — один формат (одна Piper-модель), поэтому берём
-     * 44-байтный заголовок первого и патчим в нём суммарные размеры PCM. На Dispatchers.IO.
-     */
-    fun cacheConcatenated(messageId: String, segments: List<File>) {
-        if (isReleased || segments.isEmpty()) return
-        scope.launch(Dispatchers.IO) {
-            try {
-                val datas = segments.filter { it.exists() && it.length() > 44L }.map { it.readBytes() }
-                if (datas.isEmpty()) return@launch
-                // Склейка валидна ТОЛЬКО при едином формате сегментов. При fallback часть фраз
-                // может прийти с сервера (Silero, другой sampleRate) — склеив их со sherpa-
-                // заголовком, получим неверный темп. Сверяем fmt (bytes 22..35: channels/
-                // sampleRate/byteRate/blockAlign/bits); при расхождении НЕ клеим (replay
-                // ре-синтезирует корректно цельным текстом).
-                val fmt0 = datas[0].copyOfRange(22, 36)
-                if (datas.any { !it.copyOfRange(22, 36).contentEquals(fmt0) }) {
-                    Log.w(TAG, "cacheConcatenated: разный формат сегментов — пропуск склейки")
-                    return@launch
-                }
-                val pcmTotal = datas.sumOf { (it.size - 44).toLong() }  // Long: без переполнения Int
-                val header = datas[0].copyOfRange(0, 44)
-                writeLe32(header, 4, 36L + pcmTotal)   // RIFF chunk size (UINT32)
-                writeLe32(header, 40, pcmTotal)         // data subchunk size (UINT32)
-                getCachedAudioFile(messageId).outputStream().use { os ->
-                    os.write(header)
-                    for (d in datas) os.write(d, 44, d.size - 44)
-                }
-            } catch (e: Exception) {
-                Log.w(TAG, "cacheConcatenated failed: ${e.message}")
-            }
-        }
-    }
-
-    /** Записать UINT32 little-endian (WAV-поля размера ограничены 4 GB → Long маскируем). */
-    private fun writeLe32(b: ByteArray, off: Int, v: Long) {
-        b[off] = (v and 0xFF).toByte()
-        b[off + 1] = ((v shr 8) and 0xFF).toByte()
-        b[off + 2] = ((v shr 16) and 0xFF).toByte()
-        b[off + 3] = ((v shr 24) and 0xFF).toByte()
-    }
 }

@@ -474,10 +474,12 @@ class ConversationViewModel @Inject constructor(
                     _isProcessing.value = true
                     // Bind this reply to the voice turn that triggered it, so only
                     // it gets spoken (contextual TTS). Typed turns leave it null.
-                    if (lastInputWasVoice) {
+                    // Догон озвучки: потоковый on-device TTS по фразам по мере стрима (не ждём
+                    // весь текст). ТОЛЬКО если движок готов (модель скачана) — иначе первый
+                    // голос-ответ озвучит обычный speakReply (он же скачает модель).
+                    if (lastInputWasVoice && ttsLocal.isReady()) {
                         pendingVoiceReplyRunId = event.runId
                         lastInputWasVoice = false
-                        // Догон озвучки: синтез по фразам по мере стрима (не ждём весь текст).
                         streamingTts.start(event.runId)
                     }
                 }

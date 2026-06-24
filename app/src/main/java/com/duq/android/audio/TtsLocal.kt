@@ -166,6 +166,28 @@ class TtsLocal @Inject constructor(
         }
     }
 
+    /** PCM16-сэмплы фразы (для НОРМАЛЬНОГО стриминга в AudioTrack — без WAV-файлов/очередей).
+     *  Возвращает сырые сэмплы + sampleRate. null — движок не готов (НЕ скачивает) или ошибка.
+     *  Первый голос-ответ (модель ещё не скачана) пойдёт обычным speakReply, который и скачает. */
+    suspend fun synthesizeSamples(text: String): TtsSamples? {
+        if (!isReady() || text.isBlank()) return null
+        return try {
+            withContext(Dispatchers.Default) {
+                val audio = synchronized(lock) {
+                    ensureEngine().generate(text, AppConfig.TTS_SPEAKER_ID, AppConfig.TTS_SPEED)
+                }
+                val f = audio.samples
+                val pcm = ShortArray(f.size) { i -> (f[i] * 32767f).toInt().coerceIn(-32768, 32767).toShort() }
+                TtsSamples(pcm, audio.sampleRate)
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "synthesizeSamples failed: ${e.message}"); null
+        }
+    }
+
+    /** Готов ли on-device движок (модель скачана) БЕЗ скачивания — решает, стримить ли догоном. */
+    fun isReady(): Boolean = AppConfig.TTS_ON_DEVICE && isModelReady()
+
     /** Синтезирует [text] в WAV-файл в cacheDir, ключ — [messageId]. */
     private suspend fun synthesizeWav(text: String, messageId: String): File = withContext(Dispatchers.Default) {
         context.cacheDir.listFiles { f -> f.name.startsWith(TTS_PREFIX) }?.forEach { it.delete() }
@@ -184,3 +206,6 @@ class TtsLocal @Inject constructor(
         synchronized(lock) { engine?.release(); engine = null }
     }
 }
+
+/** PCM16-сэмплы синтеза + их частота — для потокового вывода в AudioTrack (нормальный стриминг). */
+data class TtsSamples(val pcm: ShortArray, val sampleRate: Int)
