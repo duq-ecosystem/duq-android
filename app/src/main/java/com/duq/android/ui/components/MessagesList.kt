@@ -96,6 +96,9 @@ fun MessagesList(
                         AudioPlaybackState.IDLE
                     }
                     val progress = if (isCurrentlyPlaying) audioPlaybackInfo.progress else 0f
+                    // Длительность — живая из PlaybackInfo (Message.audioDurationMs не заполняется).
+                    val durationMs = if (isCurrentlyPlaying && audioPlaybackInfo.durationMs > 0)
+                        audioPlaybackInfo.durationMs.toInt() else null
 
                     MessageBubble(
                         message = message,
@@ -103,6 +106,7 @@ fun MessagesList(
                         isStreaming = message.isStreaming,
                         audioPlaybackState = audioState,
                         audioProgress = progress,
+                        audioDurationMs = durationMs,
                         onAudioPlayPauseClick = { onAudioPlayPauseClick(message.id) },
                         hazeState = hazeState
                     )

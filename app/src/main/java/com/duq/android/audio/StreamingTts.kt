@@ -57,6 +57,7 @@ class StreamingTts @Inject constructor(
         val ch = Channel<String>(Channel.UNLIMITED)
         channel = ch
         job = scope.launch {
+            val segs = mutableListOf<java.io.File>()
             for (rawSentence in ch) {
                 val text = ReplyText.clean(rawSentence)
                 if (text.isBlank()) continue
@@ -66,9 +67,10 @@ class StreamingTts @Inject constructor(
                 } catch (e: Exception) {
                     logger.e(TAG, "segment synth failed: ${e.message}"); null
                 }
-                if (file != null) playback.enqueueSegment(runId, file)
+                if (file != null) { playback.enqueueSegment(runId, file); segs.add(file) }
             }
             playback.finishStream(runId)
+            playback.cacheConcatenated(runId, segs) // единый файл → replay мгновенный + длительность
         }
     }
 

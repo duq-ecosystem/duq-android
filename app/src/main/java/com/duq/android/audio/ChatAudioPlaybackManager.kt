@@ -478,4 +478,55 @@ class ChatAudioPlaybackManager @Inject constructor(
     fun isCached(messageId: String): Boolean {
         return getCachedAudioFile(messageId).exists()
     }
+
+    /**
+     * Перепривязать кэш озвучки с одного id на другой. Нужен при reconcile: стрим-пузырь
+     * синтезировал озвучку под runId, потом усыновил серверный messageId — без переноса
+     * кэша replay по серверному id не находит файл и РЕ-СИНТЕЗИРУЕТ (долго). Переносим
+     * msg_<old>.mp3 → msg_<new>.mp3, чтобы replay был мгновенным.
+     */
+    fun renameCache(oldId: String, newId: String) {
+        if (oldId == newId) return
+        val old = getCachedAudioFile(oldId)
+        if (!old.exists()) return
+        try {
+            old.copyTo(getCachedAudioFile(newId), overwrite = true)
+            old.delete()
+        } catch (e: Exception) {
+            Log.w(TAG, "renameCache failed: ${e.message}")
+        }
+    }
+
+    /**
+     * Склеить WAV-сегменты догона в ОДИН файл кэша (replay + длительность). Догон играет
+     * пофразно и единого файла не оставляет → replay ре-синтезировал бы (долго) и
+     * длительности не было бы. Сегменты — один формат (одна Piper-модель), поэтому берём
+     * 44-байтный заголовок первого и патчим в нём суммарные размеры PCM. На Dispatchers.IO.
+     */
+    fun cacheConcatenated(messageId: String, segments: List<File>) {
+        if (isReleased || segments.isEmpty()) return
+        scope.launch(Dispatchers.IO) {
+            try {
+                val datas = segments.filter { it.exists() && it.length() > 44L }.map { it.readBytes() }
+                if (datas.isEmpty()) return@launch
+                val pcmTotal = datas.sumOf { it.size - 44 }
+                val header = datas[0].copyOfRange(0, 44)
+                writeLe32(header, 4, 36 + pcmTotal)   // RIFF chunk size
+                writeLe32(header, 40, pcmTotal)        // data subchunk size
+                getCachedAudioFile(messageId).outputStream().use { os ->
+                    os.write(header)
+                    for (d in datas) os.write(d, 44, d.size - 44)
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "cacheConcatenated failed: ${e.message}")
+            }
+        }
+    }
+
+    private fun writeLe32(b: ByteArray, off: Int, v: Int) {
+        b[off] = (v and 0xFF).toByte()
+        b[off + 1] = ((v shr 8) and 0xFF).toByte()
+        b[off + 2] = ((v shr 16) and 0xFF).toByte()
+        b[off + 3] = ((v shr 24) and 0xFF).toByte()
+    }
 }

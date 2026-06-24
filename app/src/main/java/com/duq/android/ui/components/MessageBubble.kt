@@ -51,6 +51,7 @@ fun MessageBubble(
     isStreaming: Boolean = false,
     audioPlaybackState: AudioPlaybackState = AudioPlaybackState.IDLE,
     audioProgress: Float = 0f,
+    audioDurationMs: Int? = null,   // живая длительность из PlaybackInfo (msg.audioDurationMs не заполняется)
     onAudioPlayPauseClick: () -> Unit = {},
     hazeState: dev.chrisbanes.haze.HazeState? = null
 ) {
@@ -243,7 +244,7 @@ fun MessageBubble(
                     Spacer(modifier = Modifier.height(8.dp))
                     AudioMessageControls(
                         state = audioPlaybackState,
-                        durationMs = message.audioDurationMs,
+                        durationMs = audioDurationMs ?: message.audioDurationMs,
                         progress = audioProgress,
                         onPlayPauseClick = onAudioPlayPauseClick
                     )
