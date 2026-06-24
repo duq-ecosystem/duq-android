@@ -134,10 +134,12 @@ class DuqChatClient @Inject constructor(
         }
     }
 
-    /** TEXT_DELTA — кумулятивный текст ответа на лету. Биндим к in-flight тёрну (currentRunId). */
+    /** TEXT_DELTA — кумулятивный текст ответа на лету. Биндим к in-flight тёрну: для
+     *  app-sent currentRunId уже задан в sendMessage; для server-sent (проактив/REST из
+     *  другого источника/мой curl-тест) currentRunId нет → заводим стрим-runId на первой
+     *  дельте (один на весь ответ), чтобы пузырь рос и для таких сообщений тоже. */
     fun onStreamDelta(cumulative: String) {
-        val rid = currentRunId
-        if (rid == null) { logger.d(TAG, "onStreamDelta DROP: currentRunId=null len=${cumulative.length}"); return }
+        val rid = currentRunId ?: java.util.UUID.randomUUID().toString().also { currentRunId = it }
         scope.launch { _chatEvents.emit(OcChatEvent(runId = rid, state = "delta", fullText = cumulative)) }
     }
 
