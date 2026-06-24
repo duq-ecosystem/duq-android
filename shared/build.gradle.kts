@@ -64,6 +64,7 @@ kotlin {
             implementation(libs.sherpa.onnx)
             implementation(libs.silero.vad)
             implementation(libs.commons.compress)
+            implementation(libs.okhttp)   // WhisperLocal/TtsLocal: докачка моделей (DoH-резолвер подключится с network-слоем)
             // NOTE: camerax, play-location, work, security — на фазе platform (location/camera/updater).
         }
 
