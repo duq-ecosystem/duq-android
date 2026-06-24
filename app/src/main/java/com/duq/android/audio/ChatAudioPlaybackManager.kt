@@ -217,10 +217,10 @@ class ChatAudioPlaybackManager @Inject constructor(
                 // Check cache only (no remote download)
                 val cachedFile = getCachedAudioFile(messageId)
                 if (cachedFile.exists()) {
-                    Log.d(TAG, "Using cached audio for message $messageId")
+                    flog.d(TAG, "loadAndPlay: кэш есть ${cachedFile.length()}b → playFile id=${messageId.take(8)}")
                     playFile(messageId, cachedFile)
                 } else {
-                    Log.w(TAG, "No cached audio for message $messageId")
+                    flog.w(TAG, "loadAndPlay: кэш-файла НЕТ для id=${messageId.take(8)} → пусто")
                     _playbackInfo.value = PlaybackInfo()
                 }
             } catch (e: Exception) {
@@ -261,7 +261,7 @@ class ChatAudioPlaybackManager @Inject constructor(
                                     durationMs = duration
                                 )
                                 startProgressUpdates()
-                                Log.d(TAG, "Playback started, duration: ${duration}ms")
+                                flog.d(TAG, "ExoPlayer STATE_READY играет, dur=${duration}ms")
                             }
                             Player.STATE_ENDED -> {
                                 Log.d(TAG, "Playback ended")
@@ -286,7 +286,7 @@ class ChatAudioPlaybackManager @Inject constructor(
                     }
 
                     override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
-                        Log.e(TAG, "Playback error: ${error.message}", error)
+                        flog.e(TAG, "ExoPlayer ОШИБКА: ${error.errorCodeName} ${error.message}")
                         stopProgressUpdates()
                         _playbackInfo.value = PlaybackInfo()
                     }
@@ -300,10 +300,10 @@ class ChatAudioPlaybackManager @Inject constructor(
                 player.prepare()
                 player.play()
 
-                Log.d(TAG, "Started playback for message $messageId")
+                flog.d(TAG, "playFile: setMediaItem+prepare+play вызваны id=${messageId.take(8)} file=${audioFile.name}")
 
             } catch (e: Exception) {
-                Log.e(TAG, "Error playing file: ${e.message}", e)
+                flog.e(TAG, "playFile ИСКЛЮЧЕНИЕ: ${e.message}")
                 _playbackInfo.value = PlaybackInfo()
             }
         }

@@ -754,16 +754,20 @@ class ConversationViewModel @Inject constructor(
      * Так голос «сохраняется» (replay работает всегда), а не только сразу после ответа.
      */
     fun playMessageAudio(messageId: String) {
+        flog.d(TAG, "playMessageAudio tap id=${messageId.take(8)} togonPlaying=${streamingTts.isPlaying()} cached=${audioPlaybackManager.isCached(messageId)}")
         // Живой догон сейчас озвучивает (AudioTrack) → кнопка = СТОП. Иначе playOrToggle
         // запустил бы ExoPlayer ПОВЕРХ догона (двойной звук) — догон был неуправляем кнопкой.
         if (streamingTts.isPlaying()) {
+            flog.d(TAG, "playMessageAudio → стоп догона")
             streamingTts.cancel()
             return
         }
         if (audioPlaybackManager.isCached(messageId)) {
+            flog.d(TAG, "playMessageAudio → playOrToggle (кэш есть)")
             audioPlaybackManager.playOrToggle(messageId)
             return
         }
+        flog.d(TAG, "playMessageAudio → ре-синтез (кэша нет)")
         val msg = _messages.value.firstOrNull { it.id == messageId } ?: return
         if (msg.content.isBlank() || msg.isAudioLoading) return  // guard двойного тапа во время синтеза
         val originConv = _activeConversationId.value

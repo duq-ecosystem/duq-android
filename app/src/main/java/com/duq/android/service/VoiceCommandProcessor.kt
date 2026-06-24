@@ -43,7 +43,11 @@ class VoiceCommandProcessor @Inject constructor(
     }
 
     fun releasePlayer() {
-        if (isPlayerInitialized) { chatAudioPlaybackManager.release(); isPlayerInitialized = false }
+        // НЕ release()! Плеер — общий @Singleton (его же использует кнопка play в чате).
+        // release() ставил isReleased=true НАВСЕГДА + отменял scope → ВСЁ воспроизведение
+        // (в т.ч. кнопка чата) умирало до перезапуска app. Голосовому сервису достаточно
+        // остановить текущее проигрывание; жизнь синглтона = жизнь приложения.
+        if (isPlayerInitialized) { chatAudioPlaybackManager.stop(); isPlayerInitialized = false }
     }
 
     fun stopRecording() = audioRecorder.stopRecording()
