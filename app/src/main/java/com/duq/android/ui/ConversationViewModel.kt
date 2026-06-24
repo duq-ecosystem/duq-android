@@ -246,6 +246,10 @@ class ConversationViewModel @Inject constructor(
         _messages.value = emptyList()
         _activeConversationId.value = null
         currentRunId = null
+        // Сброс голос-флагов прошлого агента: иначе ответ нового агента мог бы
+        // озвучиться по залипшему lastInputWasVoice/pendingVoiceReplyRunId.
+        pendingVoiceReplyRunId = null
+        lastInputWasVoice = false
         disarmReplyWatchdog(); _isProcessing.value = false
         _activeConversationTitle.value = _agents.value.firstOrNull { it.id == agentId }?.displayName ?: "DUQ"
         viewModelScope.launch {
