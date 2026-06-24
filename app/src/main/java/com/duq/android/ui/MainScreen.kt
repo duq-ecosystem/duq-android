@@ -431,7 +431,9 @@ fun MainScreen(
                 modifier = Modifier
                     .clip(RoundedCornerShape(8.dp))
                     .clickable {
-                        viewModel.loadConversations()  // освежить список перед показом
+                        viewModel.loadConversations()  // освежить список бесед перед показом
+                        viewModel.loadAgents()          // и список агентов — иначе созданный
+                        // позже агент не подхватится и переключатель (size>1) не появится
                         showConversationPicker = true
                     }
                     .padding(8.dp),
