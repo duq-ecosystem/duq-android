@@ -11,7 +11,8 @@ import com.google.gson.annotations.SerializedName
  *  - GET  /duq/api/task/{task_id}                          → {status,result,error}
  *  - GET  /duq/api/conversations                           → [ConversationDto] (title=topic-саммари)
  *  - GET  /duq/api/conversations/{id}/messages             → [HistoryMsg]
- *  - WS   /duq/ws                          → chat.message (live-синк) + REASONING_* (tool-шаги) + phone.command
+ *  - WS   /duq/ws  → chat.message (live-синк) + REASONING_ACTION (tool-шаги; прочие
+ *         REASONING_* клиент игнорирует, см. DuqChatClient.onReasoning) + phone.command
  *
  * Запросы несут edge-токен X-Auth-Token (ServerAuth.withServerAuth());
  * /conversations|/messages дополнительно — Authorization: Bearer (DuqRestClient.withBearer).

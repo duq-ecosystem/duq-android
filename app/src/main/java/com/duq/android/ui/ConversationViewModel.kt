@@ -205,11 +205,10 @@ class ConversationViewModel @Inject constructor(
 
     private val flog = com.duq.android.logging.FileLogger(context)
 
-    // ── Переключатель диалогов (ядро одноагентное → единица переключения = беседа,
-    //    не агент; прежний picker main/strain/digest был мёртв — switchAgent грузил ту
-    //    же историю). Список бесед из /conversations, выбор грузит /messages беседы,
-    //    отправка адресуется в активную беседу (conversation_id), «Новый чат» стартует
-    //    свежую (new_conversation). ──
+    // ── Переключатель диалогов: список бесед из /conversations (опц. по agent_id),
+    //    выбор грузит /messages беседы; отправка адресуется в активную беседу
+    //    (conversation_id), «Новый чат» стартует свежую (new_conversation). Мульти-агенты:
+    //    switchAgent грузит РАЗДЕЛЬНЫЕ истории выбранного агента (своя сессия per agent). ──
     private val _conversations = MutableStateFlow<List<com.duq.android.network.duq.DuqConversation>>(emptyList())
     val conversations: StateFlow<List<com.duq.android.network.duq.DuqConversation>> = _conversations.asStateFlow()
 

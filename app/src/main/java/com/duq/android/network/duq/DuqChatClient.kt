@@ -30,9 +30,8 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Фасад чата поверх нового ядра DUQ ([DuqRestClient]). Держит ТОТ ЖЕ публичный API,
- * что ожидают потребители чата (ConversationViewModel,
- * DuqListenerService) — чтобы переключение прошло без правок их логики:
+ * Фасад чата поверх ядра DUQ ([DuqRestClient]). Публичный API для потребителей
+ * чата (ConversationViewModel, DuqListenerService):
  *
  *  - [start], [connectionState]
  *  - [sendMessage] → enqueue + poll-await → эмит одного терминального [OcChatEvent]
