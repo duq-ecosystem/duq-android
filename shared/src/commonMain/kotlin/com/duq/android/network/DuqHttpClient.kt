@@ -1,0 +1,42 @@
+package com.duq.android.network
+
+import com.duq.android.config.AppConfig
+import io.ktor.client.HttpClient
+import io.ktor.client.HttpClientConfig
+import io.ktor.client.plugins.DefaultRequest
+import io.ktor.client.plugins.HttpTimeout
+import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.client.plugins.defaultRequest
+import io.ktor.client.plugins.websocket.WebSockets
+import io.ktor.client.request.header
+import io.ktor.serialization.kotlinx.json.json
+import kotlinx.serialization.json.Json
+
+/** Общий JSON ядра: лишние поля игнорим, null-поля с дефолтом не кодируем (как Gson omit-null). */
+val duqJson: Json = Json {
+    ignoreUnknownKeys = true
+    encodeDefaults = false
+    isLenient = true
+}
+
+/**
+ * Платформенный движок Ktor: OkHttp (Android, + DoH в actual) / Darwin (iOS).
+ * Общая конфигурация (JSON, WebSockets, edge-токен) задаётся здесь, в commonMain.
+ */
+expect fun platformHttpClient(block: HttpClientConfig<*>.() -> Unit): HttpClient
+
+/** Единый HTTP/WS-клиент DUQ: edge-токен X-Auth-Token на всех запросах + JSON + WebSockets. */
+fun createDuqHttpClient(): HttpClient = platformHttpClient {
+    install(ContentNegotiation) { json(duqJson) }
+    install(WebSockets)
+    install(HttpTimeout) {
+        connectTimeoutMillis = AppConfig.CONNECT_TIMEOUT_S * 1000
+        requestTimeoutMillis = AppConfig.READ_TIMEOUT_S * 1000
+    }
+    install(DefaultRequest) {
+        if (AppConfig.SERVER_TOKEN.isNotEmpty()) {
+            header(AppConfig.SERVER_TOKEN_HEADER, AppConfig.SERVER_TOKEN)
+        }
+    }
+    expectSuccess = false
+}

@@ -31,23 +31,33 @@ kotlin {
             implementation(compose.materialIconsExtended)
             implementation(compose.ui)
             implementation(compose.components.resources)
-            // Serialization / coroutines (нужны уже для DTO-слоя)
+            // Serialization / coroutines
             implementation(libs.kotlinx.serialization.json)
             implementation(libs.kotlinx.coroutines.core)
-            // NOTE: navigation/lifecycle/koin/ktor/multiplatform-settings/haze добавляются
-            // на своих фазах (UI/DI/сеть/storage) с выверенными версиями + проверкой CI.
+            // DI (Koin) — выверенная версия 4.1.1
+            implementation(libs.koin.core)
+            implementation(libs.koin.compose)
+            // Network (Ktor 3.5.0)
+            implementation(libs.ktor.client.core)
+            implementation(libs.ktor.client.content.negotiation)
+            implementation(libs.ktor.serialization.json)
+            implementation(libs.ktor.client.websockets)
+            implementation(libs.ktor.client.logging)
+            // NOTE: navigation/lifecycle/multiplatform-settings/haze — на фазах UI/storage.
         }
 
         androidMain.dependencies {
             implementation(libs.androidx.core.ktx)
             implementation(libs.androidx.activity.compose)
             implementation(libs.kotlinx.coroutines.android)
-            // NOTE: koin-android, ktor-okhttp, media3, sherpa-onnx, silero-vad, camerax,
-            // play-location, work, security — добавляются на фазах сети/DI/audio/platform.
+            implementation(libs.koin.android)
+            implementation(libs.ktor.client.okhttp)
+            // NOTE: media3, sherpa-onnx, silero-vad, camerax, play-location, work, security —
+            // на фазе audio/platform (expect/actual).
         }
 
         iosMain.dependencies {
-            // NOTE: ktor-darwin добавляется на фазе сети.
+            implementation(libs.ktor.client.darwin)
         }
     }
 }
