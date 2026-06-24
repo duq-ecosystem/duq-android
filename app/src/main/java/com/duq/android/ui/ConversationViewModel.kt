@@ -57,7 +57,13 @@ class ConversationViewModel @Inject constructor(
     }
 
     private val _messages = MutableStateFlow<List<Message>>(emptyList())
-    val messages: StateFlow<List<Message>> = _messages.asStateFlow()
+    // Канонический порядок = серверный createdAt (стабильная сортировка: при равном времени
+    // сохраняется порядок вставки, история уже приходит ordered). Корень-фикс «сообщение
+    // встало не по порядку»: раньше список рос аппендом в порядке ПРИХОДА + Instant.now(),
+    // поэтому live-сообщение, пришедшее после уже отрисованного ответа, ложилось ниже него.
+    val messages: StateFlow<List<Message>> = _messages
+        .map { list -> list.sortedBy { it.createdAt } }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     val connectionState: StateFlow<GatewayConnectionState> = gatewayClient.connectionState
 
@@ -209,7 +215,23 @@ class ConversationViewModel @Inject constructor(
         // hasAudio=msg.voice СРАЗУ — кнопка play на озвученном ответе появляется без задержки
         // (раньше ставилась постфактум в speakReply после синтеза; если беседа перезагружалась
         // из REST до конца синтеза — обновление терялось до следующей перезагрузки).
-        _messages.update { it + Message(id = msg.messageId, role = role, content = msg.content, hasAudio = msg.voice) }
+        _messages.update {
+            it + Message(
+                id = msg.messageId, role = role, content = msg.content, hasAudio = msg.voice,
+                // Серверное время — чтобы live-сообщение встало по порядку (а не в конец по приходу).
+                createdAt = parseServerTime(msg.createdAt),
+            )
+        }
+    }
+
+    /** ISO-8601 серверного времени → Instant; null/мусор → now() (новейшее, в конец).
+     *  Python isoformat() для naive-datetime БЕЗ таймзоны (Instant.parse его не берёт) →
+     *  парсим как LocalDateTime и считаем UTC (сервер в UTC). */
+    private fun parseServerTime(iso: String?): java.time.Instant {
+        if (iso.isNullOrBlank()) return java.time.Instant.now()
+        return runCatching { java.time.Instant.parse(iso) }.getOrNull()
+            ?: runCatching { java.time.LocalDateTime.parse(iso).toInstant(java.time.ZoneOffset.UTC) }.getOrNull()
+            ?: java.time.Instant.now()
     }
 
     /** chat.message-дубль уже отрисованного стрим-пузыря → усыновить серверный id (ключ
@@ -325,6 +347,8 @@ class ConversationViewModel @Inject constructor(
             // Длительность из кэш-WAV — чтобы показывалась на кнопке сразу после рестарта,
             // не дожидаясь проигрывания (живой PlaybackInfo появляется только при replay).
             audioDurationMs = if (cached) audioPlaybackManager.cachedDurationMs(mid).takeIf { it > 0 } else null,
+            // Серверное время (Unix-сек) — канонический порядок сортировки. Без него Instant.now().
+            createdAt = if (createdAt > 0) java.time.Instant.ofEpochSecond(createdAt) else java.time.Instant.now(),
         )
     }
 

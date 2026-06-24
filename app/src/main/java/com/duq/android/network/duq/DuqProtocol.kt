@@ -69,7 +69,10 @@ data class HistoryMsg(
     val role: String,    // "user" | "assistant"
     val content: String,
     // ответ был озвучен → показать кнопку play в истории (camelCase + маппинг на snake_case JSON)
-    @SerializedName("has_audio") val hasAudio: Boolean = false
+    @SerializedName("has_audio") val hasAudio: Boolean = false,
+    // Серверное время создания (Unix-секунды) — КАНОНИЧЕСКИЙ порядок сообщений. Без него
+    // клиент сортировал по Instant.now()/приходу → сообщения вставали не по порядку.
+    @SerializedName("created_at") val createdAt: Long = 0
 )
 
 /**
@@ -85,7 +88,10 @@ data class DuqIncomingMessage(
     // переключении). null — старый формат пуша без conversation_id.
     val conversationId: String? = null,
     // Модель решила озвучить (set_response_mode voice) — клиент синтезирует TTS.
-    val voice: Boolean = false
+    val voice: Boolean = false,
+    // Серверное время создания (ISO-8601) — канонический порядок. Без него live-сообщение,
+    // пришедшее ПОСЛЕ уже отрисованного ответа, вставало НИЖЕ него (баг порядка).
+    @SerializedName("created_at") val createdAt: String? = null
 )
 
 // ── Чат-события / состояние соединения (перенесено из удалённого легаси-слоя) ──
@@ -115,7 +121,8 @@ data class OcHistoryMsg(
     val role: String,  // "user" | "assistant"
     val text: String,
     val id: String? = null,        // серверный id (ключ кэша озвучки)
-    val hasAudio: Boolean = false  // ответ был озвучен → кнопка play в истории
+    val hasAudio: Boolean = false, // ответ был озвучен → кнопка play в истории
+    val createdAt: Long = 0        // серверное время (Unix-секунды) — канонический порядок
 )
 
 /**
