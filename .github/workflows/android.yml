@@ -54,11 +54,16 @@ jobs:
         SERVER_TOKEN: ${{ secrets.SERVER_TOKEN }}
 
     # version.json — манифест обновления, который опрашивает AppUpdater (versionCode == APK).
-    - name: Generate update manifest
+    # APK переименовываем в app-release.apk — именно это имя ассета ищет AppUpdater
+    # (AndroidAppUpdateController.APK_ASSET_NAME). Иначе автообновление видит версию, но
+    # не находит файл («app-release.apk не найден в релизе»).
+    - name: Generate update manifest + rename APK for AppUpdater
       if: github.event_name == 'push'
       run: |
         printf '{"versionCode": %s, "versionName": "1.0.%s"}\n' "$DUQ_VERSION_CODE" "$DUQ_VERSION_CODE" > version.json
         cat version.json
+        cp androidApp/build/outputs/apk/release/androidApp-release.apk \
+           androidApp/build/outputs/apk/release/app-release.apk
 
     - name: Create GitHub Release with APK
       if: github.event_name == 'push'
@@ -68,7 +73,7 @@ jobs:
         name: "Build #${{ env.DUQ_VERSION_CODE }}"
         body: ${{ github.event.head_commit.message }}
         files: |
-          androidApp/build/outputs/apk/release/androidApp-release.apk
+          androidApp/build/outputs/apk/release/app-release.apk
           version.json
         prerelease: false
         make_latest: true
