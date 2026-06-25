@@ -32,11 +32,23 @@ actual val platformModule: Module = module {
     single<AppUpdateController> { AndroidAppUpdateController(androidContext(), get()) }
     single<CoreUpdateNotifier> { AndroidCoreUpdateNotifier(androidContext(), get()) }
 
-    // WS bot→phone + presence + чат/reasoning-стрим. Без этого бинда WS /duq/ws не
-    // подключался на Android → ответы чата не приходили (watchdog 90с). phone-control
-    // деградирует (camera/location ещё в app/), но стрим ответа работает.
+    // Геолокация (phone-control location.get + фоновые city-level апдейты).
+    single<com.duq.android.location.LocationDataSource> {
+        com.duq.android.location.FusedLocationDataSource(androidContext())
+    }
+
+    // WS bot→phone + presence + чат/reasoning-стрим. Полная нативная phone-control
+    // реализация (CameraX snap, FusedLocation, MediaProjection screen.record, on-device
+    // STT voice.activate, notify.show) — НЕ заглушка. Зависимости: LocationDataSource,
+    // AudioRecorderInterface/LocalStt (audioModule), Logger (platformModule).
     single<com.duq.android.network.duq.PhoneCommandExecutor> {
-        com.duq.android.network.duq.AndroidPhoneCommandExecutor(get())
+        com.duq.android.network.duq.AndroidPhoneCommandExecutor(
+            context = androidContext(),
+            locationDataSource = get(),
+            audioRecorder = get(),
+            whisper = get(),
+            logger = get(),
+        )
     }
     single { com.duq.android.network.duq.DuqNodeClient(get(), get(), get(), get()) }
 }

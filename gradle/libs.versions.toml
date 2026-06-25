@@ -9,6 +9,7 @@ ksp = "2.3.20-2.0.4"
 # AndroidX / Compose-MP companion libs (JetBrains multiplatform forks)
 androidx-activityCompose = "1.9.3"
 androidx-core = "1.13.1"
+androidx-lifecycle-runtime = "2.8.7"   # androidx.lifecycle (LifecycleRegistry/LifecycleOwner для CameraX-захвата)
 lifecycle = "2.9.4"           # org.jetbrains.androidx.lifecycle (multiplatform, стабильная 2.9.x)
 navigation = "2.9.2"          # org.jetbrains.androidx.navigation (офиц. KMP doc для CMP 1.11)
 
@@ -86,6 +87,7 @@ androidx-media3-exoplayer = { module = "androidx.media3:media3-exoplayer", versi
 androidx-camera-camera2 = { module = "androidx.camera:camera-camera2", version.ref = "camerax" }
 androidx-camera-lifecycle = { module = "androidx.camera:camera-lifecycle", version.ref = "camerax" }
 androidx-camera-view = { module = "androidx.camera:camera-view", version.ref = "camerax" }
+androidx-lifecycle-runtime-ktx = { module = "androidx.lifecycle:lifecycle-runtime-ktx", version.ref = "androidx-lifecycle-runtime" }
 play-services-location = { module = "com.google.android.gms:play-services-location", version.ref = "playServicesLocation" }
 silero-vad = { module = "com.github.gkonovalov.android-vad:silero", version.ref = "sileroVad" }
 sherpa-onnx = { module = "com.github.k2-fsa:sherpa-onnx", version.ref = "sherpaOnnx" }

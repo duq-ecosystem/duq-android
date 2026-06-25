@@ -77,7 +77,14 @@ kotlin {
             implementation(libs.commons.compress)
             implementation(libs.okhttp)   // WhisperLocal/TtsLocal: докачка моделей + DoH-резолвер для Ktor OkHttp-движка
             implementation(libs.okhttp.dnsoverhttps)  // DoH fallback (обход «Unable to resolve host») в OkHttp-движке Ktor
-            // NOTE: camerax, play-location, work, security — на фазе platform (location/camera/updater).
+            // phone-control (bot→phone native commands): camera.snap (CameraX headless ImageCapture),
+            // location.get (FusedLocation), screen.record (MediaProjection из platform SDK — без доп. dep),
+            // lifecycle-runtime для одноразового LifecycleRegistry capture-владельца.
+            implementation(libs.androidx.camera.camera2)
+            implementation(libs.androidx.camera.lifecycle)
+            implementation(libs.androidx.camera.view)
+            implementation(libs.androidx.lifecycle.runtime.ktx)
+            implementation(libs.play.services.location)
         }
 
         iosMain.dependencies {

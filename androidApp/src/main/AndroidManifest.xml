@@ -3,12 +3,27 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.INTERNET" />
-    <!-- Голос: запись микрофона (push-to-talk, on-device STT). -->
+    <!-- Голос: запись микрофона (push-to-talk, on-device STT, phone-control voice.activate). -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
-    <!-- Уведомления (Android 13+): центр уведомлений + апдейт-баннеры. -->
+    <!-- Уведомления (Android 13+): центр уведомлений + апдейт-баннеры + phone-control notify.show. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- Self-update: установка скачанного APK (sideload-канал, не Play Store). -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+
+    <!-- phone-control (bot→phone native commands) -->
+    <!-- camera.snap: CameraX headless ImageCapture. -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <!-- location.get: FusedLocationProvider. -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <!-- screen.record: MediaProjection требует живой foreground-service с типом mediaProjection (A14+). -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CAMERA" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+    <!-- screen.record consent: full-screen intent поднимает consent-Activity из фона. -->
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
 
     <application
         android:name=".DuqApplication"
@@ -40,6 +55,23 @@
                 <action android:name="com.duq.android.INSTALL_STATUS" />
             </intent-filter>
         </receiver>
+
+        <!-- phone-control screen.record: невидимая Activity дёргает системный
+             MediaProjection consent-диалог и отдаёт результат в ScreenCaptureManager.
+             Класс — в shared (пакет com.duq.android.screen). -->
+        <activity
+            android:name="com.duq.android.screen.ScreenConsentActivity"
+            android:exported="false"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar"
+            android:excludeFromRecents="true" />
+
+        <!-- phone-control screen.record: короткоживущий FGS держит mediaProjection-тип
+             на время записи экрана (A14+ требует активный сервис с этим типом до
+             getMediaProjection). Класс — в shared. -->
+        <service
+            android:name="com.duq.android.screen.MediaProjectionForegroundService"
+            android:foregroundServiceType="dataSync|mediaProjection"
+            android:exported="false" />
 
     </application>
 
