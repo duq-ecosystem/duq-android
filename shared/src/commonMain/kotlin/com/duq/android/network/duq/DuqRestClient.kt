@@ -1,6 +1,7 @@
 package com.duq.android.network.duq
 
 import com.duq.android.config.AppConfig
+import com.duq.android.data.SettingsRepository
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.delete
@@ -20,10 +21,39 @@ import io.ktor.http.isSuccess
  * [conversations]/[messages]. Edge-токен X-Auth-Token шлётся через DefaultRequest
  * (см. DuqHttpClient); /conversations|/messages дополнительно требуют Bearer.
  */
-class DuqRestClient(private val client: HttpClient) {
+class DuqRestClient(
+    private val client: HttpClient,
+    private val settings: SettingsRepository,
+) {
 
     private fun url(path: String) = AppConfig.DUQ_API_BASE_URL + path
     private val bearer get() = "Bearer ${AppConfig.SERVER_TOKEN}"
+
+    /**
+     * Мультиюзер: гарантирует, что у устройства есть персональный user_id. Нет → регистрирует
+     * члена семьи (POST /api/auth/register method=app) и сохраняет user_id локально. Идемпотентно.
+     */
+    suspend fun ensureRegistered(name: String? = null): String {
+        settings.getUserId().takeIf { it.isNotBlank() }?.let { return it }
+        val resp = client.post(url("auth/register")) {
+            contentType(ContentType.Application.Json)
+            setBody(RegisterRequest(name = name ?: settings.getUserName().ifBlank { null }))
+        }
+        if (!resp.status.isSuccess()) throw DuqApiException("register ${resp.status}")
+        val uid = resp.body<RegisterResponse>().userId
+            ?: throw DuqApiException("register: no user_id")
+        settings.saveUserId(uid)
+        return uid
+    }
+
+    /** Статусы интеграций юзера (google/obsidian) для панели профиля. */
+    suspend fun integrations(): IntegrationsResponse {
+        val uid = settings.getUserId()
+        if (uid.isBlank()) return IntegrationsResponse()
+        val resp = client.get(url("integrations") + "?user_id=$uid")
+        if (!resp.status.isSuccess()) throw DuqApiException("integrations ${resp.status}")
+        return resp.body()
+    }
 
     suspend fun sendMessage(
         text: String,
@@ -33,7 +63,12 @@ class DuqRestClient(private val client: HttpClient) {
     ): String {
         val resp = client.post(url("message")) {
             contentType(ContentType.Application.Json)
-            setBody(MessageRequest(text, conversationId, if (newConversation) true else null, agentId))
+            setBody(
+                MessageRequest(
+                    text, conversationId, if (newConversation) true else null, agentId,
+                    userId = settings.getUserId().ifBlank { null },
+                )
+            )
         }
         if (!resp.status.isSuccess()) throw DuqApiException("message ${resp.status}")
         return resp.body<MessageEnqueued>().taskId

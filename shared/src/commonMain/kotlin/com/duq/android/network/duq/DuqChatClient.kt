@@ -61,6 +61,16 @@ class DuqChatClient(
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
+    init {
+        // Мультиюзер: при первом запуске регистрируем устройство как члена семьи и сохраняем
+        // персональный user_id (шлётся затем в каждом сообщении → ядро различает членов семьи
+        // поверх общего edge-токена). Идемпотентно: user_id уже есть → no-op.
+        scope.launch {
+            runCatching { rest.ensureRegistered() }
+                .onFailure { logger.e(TAG, "ensureRegistered failed: ${it.message}") }
+        }
+    }
+
     private val _connectionState = MutableStateFlow(GatewayConnectionState.DISCONNECTED)
     val connectionState: StateFlow<GatewayConnectionState> = _connectionState.asStateFlow()
 

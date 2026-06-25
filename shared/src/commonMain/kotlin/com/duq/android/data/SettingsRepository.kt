@@ -28,6 +28,8 @@ class SettingsRepository(private val settings: Settings) {
         private const val KEY_WAKE_WORD_SENSITIVITY = "wake_word_sensitivity"
         private const val KEY_SILENCE_TIMEOUT_MS = "silence_timeout_ms"
         private const val KEY_LAST_REPORTED_LOCATION = "last_reported_location"
+        private const val KEY_USER_ID = "duq_user_id"
+        private const val KEY_USER_NAME = "duq_user_name"
 
         const val DEFAULT_WAKE_WORD_SENSITIVITY = 0.9f
         const val DEFAULT_SILENCE_TIMEOUT_MS = 2000L
@@ -35,6 +37,14 @@ class SettingsRepository(private val settings: Settings) {
 
     // Авторизация устройства — build-time edge-token (BuildConfig.SERVER_TOKEN), не
     // per-device пейринг. Поля device/node/bootstrap/gateway (Ed25519/legacy) удалены.
+
+    // Мультиюзер: персональный user_id (UUID) этого устройства, выдан ядром при регистрации
+    // (POST /api/auth/register method=app). Шлётся в каждом сообщении → ядро различает членов
+    // семьи поверх общего edge-токена. Пусто = ещё не зарегистрирован.
+    fun getUserId(): String = settings[KEY_USER_ID, ""]
+    fun saveUserId(id: String) { settings[KEY_USER_ID] = id }
+    fun getUserName(): String = settings[KEY_USER_NAME, ""]
+    fun saveUserName(name: String) { settings[KEY_USER_NAME] = name }
 
     /** Last lat/lng reported to DUQ — used to suppress duplicate reports across restarts. */
     fun getLastReportedLocation(): Pair<Double, Double>? {

@@ -31,7 +31,7 @@ import org.koin.dsl.module
  */
 val networkModule = module {
     single { createDuqHttpClient() }
-    single { DuqRestClient(get()) }
+    single { DuqRestClient(get(), get()) }
     // DuqChatClient(rest, stt: LocalStt, http, logger) — LocalStt из audioModule, logger из platformModule.
     single { DuqChatClient(get(), get(), get(), get()) }
     single { TtsClient(get()) }

@@ -22,7 +22,36 @@ data class MessageRequest(
     val message: String,
     @SerialName("conversation_id") val conversationId: String? = null,
     @SerialName("new_conversation") val newConversation: Boolean? = null,
-    @SerialName("agent_id") val agentId: String? = null
+    @SerialName("agent_id") val agentId: String? = null,
+    // Мультиюзер: внутренний UUID юзера (выдан при регистрации). Ядро адресует задачу ему
+    // (его память/ресурсы), а не владельцу. null → старый путь (владелец) на сервере.
+    @SerialName("user_id") val userId: String? = null
+)
+
+/** Регистрация члена семьи из приложения (POST /api/auth/register, method=app). */
+@Serializable
+data class RegisterRequest(
+    val method: String = "app",
+    val name: String? = null
+)
+
+@Serializable
+data class RegisterResponse(
+    val success: Boolean = false,
+    @SerialName("user_id") val userId: String? = null
+)
+
+/** Статусы интеграций юзера (GET /api/integrations?user_id=). */
+@Serializable
+data class IntegrationsResponse(
+    @SerialName("user_id") val userId: String = "",
+    val integrations: IntegrationsStatus = IntegrationsStatus()
+)
+
+@Serializable
+data class IntegrationsStatus(
+    val google: Boolean = false,
+    val obsidian: Boolean = false
 )
 
 /** Один агент из реестра ядра (GET /duq/api/agents). */
