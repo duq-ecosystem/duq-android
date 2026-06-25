@@ -17,11 +17,10 @@ import java.io.File
  * Контекст модели грузится один раз и переиспользуется (init дорогой).
  * Потокобезопасность: transcribe вызывается из одного voice-флоу за раз; на всякий — synchronized.
  *
- * ⚠️ JNI-слой (libduqwhisper + cpp/CMake) на этой фазе KMP-миграции в shared ЕЩЁ НЕ собран
- * (cpp/ не переехал из референсного app/ в src/androidMain/cpp + externalNativeBuild). Пока
- * нативная либа недоступна, [tryTranscribe] честно отдаёт null → вызывающий уходит на серверный
- * /stt (полноценная деградация, не заглушка). Когда cpp/CMake подключат — on-device заработает
- * автоматически (флаг [nativeAvailable] станет true).
+ * JNI-слой (libduqwhisper + статика whisper.cpp) собран в src/androidMain/cpp через
+ * externalNativeBuild (CMake) → libduqwhisper.so попадает в APK (arm64-v8a). Если либа
+ * по какой-то причине всё же не загрузилась (loadLibrary упал), [tryTranscribe] честно
+ * отдаёт null → вызывающий уходит на серверный /stt (полноценная деградация, не заглушка).
  */
 class WhisperLocal(
     private val context: Context
@@ -30,10 +29,10 @@ class WhisperLocal(
     companion object {
         private const val TAG = "WhisperLocal"
 
-        // Грузим нативную либу мягко: пока JNI (cpp/CMake) не переехал в shared,
-        // libduqwhisper.so в APK нет → loadLibrary бросит UnsatisfiedLinkError. Ловим и
-        // помечаем nativeAvailable=false, чтобы on-device STT тихо деградировал на сервер
-        // вместо краша. Когда либу соберут — флаг сам станет true.
+        // Грузим нативную либу мягко: libduqwhisper.so собирается externalNativeBuild и
+        // лежит в APK. Если на устройстве её всё же нет (старый APK / сбой сборки),
+        // loadLibrary бросит UnsatisfiedLinkError — ловим и помечаем nativeAvailable=false,
+        // чтобы on-device STT тихо деградировал на сервер вместо краша.
         private val nativeAvailable: Boolean = try {
             System.loadLibrary("duqwhisper")
             true

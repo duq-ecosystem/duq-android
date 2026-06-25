@@ -93,13 +93,27 @@ android {
     defaultConfig {
         minSdk = libs.versions.android.minSdk.get().toInt()
         ndk { abiFilters += "arm64-v8a" }
-        // NOTE: on-device STT (whisper.cpp JNI + CMake) подключается на фазе audio,
-        // когда cpp/ переедет из референс-модуля app/ в src/androidMain/cpp.
+
+        // On-device STT: собираем libduqwhisper.so (JNI-мост + статика whisper.cpp).
+        externalNativeBuild {
+            cmake {
+                cppFlags += "-std=c++17"
+                arguments += "-DANDROID_STL=c++_static"
+            }
+        }
     }
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    // Путь к CMake-скрипту JNI-моста whisper.cpp (libduqwhisper.so).
+    externalNativeBuild {
+        cmake {
+            path = file("src/androidMain/cpp/CMakeLists.txt")
+            version = "3.22.1"
+        }
     }
 
     packaging {
