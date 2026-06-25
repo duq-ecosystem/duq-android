@@ -85,5 +85,10 @@ dependencies {
     implementation(compose.runtime)
     implementation(compose.ui)
     implementation(libs.androidx.activity.compose)
-    // koin-android добавляется на фазе DI (init Koin в DuqApplication).
+    // ContextCompat.checkSelfPermission в MainActivity (запрос RECORD_AUDIO/POST_NOTIFICATIONS).
+    implementation(libs.androidx.core.ktx)
+    // Koin: startKoin/androidContext в DuqApplication (shared биндит модули как implementation,
+    // потому на app-классе нужны явные core+android).
+    implementation(libs.koin.core)
+    implementation(libs.koin.android)
 }

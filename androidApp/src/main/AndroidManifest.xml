@@ -3,6 +3,12 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Голос: запись микрофона (push-to-talk, on-device STT). -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <!-- Уведомления (Android 13+): центр уведомлений + апдейт-баннеры. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Self-update: установка скачанного APK (sideload-канал, не Play Store). -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <application
         android:name=".DuqApplication"
@@ -24,6 +30,16 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Статус PackageInstaller-сессии для self-update (AndroidAppUpdateController →
+             InstallResultReceiver поднимает диалог подтверждения). exported=false. -->
+        <receiver
+            android:name="com.duq.android.ui.InstallResultReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.duq.android.INSTALL_STATUS" />
+            </intent-filter>
+        </receiver>
 
     </application>
 
