@@ -17,9 +17,12 @@ class DuqApplication : Application() {
         super.onCreate()
         AppSecrets.serverToken = BuildConfig.SERVER_TOKEN
         AppSecrets.githubReleaseToken = BuildConfig.GH_RELEASE_TOKEN
-        startKoin {
+        val koinApp = startKoin {
             androidContext(this@DuqApplication)
             modules(sharedModules())
         }
+        // Поднимаем WS /duq/ws (presence + чат/reasoning-стрим TEXT_DELTA). Без этого
+        // ответы чата не приходят (раньше WS держал DuqListenerService — не перенесён).
+        koinApp.koin.get<com.duq.android.network.duq.DuqNodeClient>().start()
     }
 }

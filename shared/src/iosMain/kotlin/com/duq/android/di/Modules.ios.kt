@@ -47,5 +47,6 @@ actual val platformModule: Module = module {
 fun initKoinIos() {
     // Когда появится iOS-проводка секретов: AppSecrets.serverToken/githubReleaseToken
     // заполнить из Info.plist здесь, до startKoin.
-    startKoin { modules(sharedModules()) }
+    val koinApp = startKoin { modules(sharedModules()) }
+    koinApp.koin.get<com.duq.android.network.duq.DuqNodeClient>().start()
 }

@@ -31,4 +31,12 @@ actual val platformModule: Module = module {
     single<AudioFileCache> { AndroidAudioFileCache(androidContext(), get()) }
     single<AppUpdateController> { AndroidAppUpdateController(androidContext(), get()) }
     single<CoreUpdateNotifier> { AndroidCoreUpdateNotifier(androidContext(), get()) }
+
+    // WS bot→phone + presence + чат/reasoning-стрим. Без этого бинда WS /duq/ws не
+    // подключался на Android → ответы чата не приходили (watchdog 90с). phone-control
+    // деградирует (camera/location ещё в app/), но стрим ответа работает.
+    single<com.duq.android.network.duq.PhoneCommandExecutor> {
+        com.duq.android.network.duq.AndroidPhoneCommandExecutor(get())
+    }
+    single { com.duq.android.network.duq.DuqNodeClient(get(), get(), get(), get()) }
 }
