@@ -66,6 +66,13 @@ data class FamilyMembersResponse(
     val members: List<FamilyMember> = emptyList()
 )
 
+/** Ответ /api/auth/google/link — URL для OAuth-входа в браузере (или error, если не настроен). */
+@Serializable
+data class GoogleLinkResponse(
+    val url: String = "",
+    val error: String = ""
+)
+
 /** Статусы интеграций юзера (GET /api/integrations?user_id=). */
 @Serializable
 data class IntegrationsResponse(

@@ -51,6 +51,19 @@ class DuqRestClient(
         uid
     }
 
+    /** Google OAuth: получить URL для входа в браузере (per-user). Бросает с текстом, если
+     *  сервер не настроен (нет GOOGLE_CLIENT_ID) — app покажет внятно. */
+    suspend fun googleAuthUrl(): String {
+        val uid = settings.getUserId()
+        if (uid.isBlank()) throw DuqApiException("not logged in")
+        val resp = client.get(url("auth/google/link") + "?user_id=$uid&chat_id=0")
+        val body = resp.body<GoogleLinkResponse>()
+        if (!resp.status.isSuccess() || body.url.isBlank()) {
+            throw DuqApiException(body.error.ifBlank { "google link ${resp.status}" })
+        }
+        return body.url
+    }
+
     /** Все члены семьи — ТОЛЬКО для admin (для секции «все пользователи» в профиле). */
     suspend fun familyMembers(): List<FamilyMember> {
         val uid = settings.getUserId()

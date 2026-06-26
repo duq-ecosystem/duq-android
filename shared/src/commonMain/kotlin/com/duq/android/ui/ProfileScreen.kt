@@ -23,7 +23,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -154,7 +154,7 @@ fun ProfileScreen(
                 modifier = Modifier.padding(start = 4.dp))
             ObsidianCard(connected = info.integrations.obsidian, rest = rest,
                 onLinked = { scope.launch { reload() } })
-            IntegrationCard(Icons.Outlined.Mail, "Google", "Почта и календарь", info.integrations.google)
+            GoogleCard(connected = info.integrations.google, rest = rest)
 
             Spacer(Modifier.height(8.dp))
         }
@@ -243,20 +243,42 @@ private fun SectionCard(content: @Composable ColumnScope.() -> Unit) {
     )
 }
 
+/** Google: статус + «Подключить» → открывает OAuth-вход в браузере (per-user). */
 @Composable
-private fun IntegrationCard(icon: ImageVector, title: String, subtitle: String, connected: Boolean) {
-    Row(
+private fun GoogleCard(connected: Boolean, rest: DuqRestClient) {
+    val scope = rememberCoroutineScope()
+    val uriHandler = LocalUriHandler.current
+    var err by remember { mutableStateOf("") }
+    Column(
         modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp))
             .background(DuqColors.surfaceVariant).padding(16.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(14.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Icon(icon, contentDescription = title, tint = DuqColors.textSecondary, modifier = Modifier.size(26.dp))
-        Column(Modifier.weight(1f)) {
-            Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Medium)
-            Text(subtitle, style = MaterialTheme.typography.bodySmall, color = DuqColors.textDim)
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            Icon(Icons.Outlined.Mail, "Google", tint = DuqColors.textSecondary, modifier = Modifier.size(26.dp))
+            Column(Modifier.weight(1f)) {
+                Text("Google", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Medium)
+                Text("Почта и календарь", style = MaterialTheme.typography.bodySmall, color = DuqColors.textDim)
+            }
+            StatusChip(connected)
         }
-        StatusChip(connected)
+        if (!connected) {
+            Button(
+                onClick = {
+                    scope.launch {
+                        err = runCatching { uriHandler.openUri(rest.googleAuthUrl()); "" }
+                            .getOrElse { "Ошибка: ${it.message}" }
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+            ) { Text("Войти через Google") }
+            if (err.isNotBlank()) {
+                Text(err, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+            }
+        }
     }
 }
 
@@ -302,13 +324,18 @@ private fun ObsidianCard(connected: Boolean, onLinked: () -> Unit, rest: DuqRest
         }
         AnimatedVisibility(expanded) {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(
+                    "URL и MCP-токен — от твоего vault-sync. Passphrase и Salt — E2EE-ключ волта " +
+                        "из настроек плагина Obsidian VaultSync (тот же, чем шифруется синк).",
+                    style = MaterialTheme.typography.bodySmall, color = DuqColors.textDim,
+                )
                 OutlinedTextField(url, { url = it }, label = { Text("URL волта (vault-sync MCP)") },
                     singleLine = true, modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(token, { token = it }, label = { Text("MCP-токен (опц.)") },
+                OutlinedTextField(token, { token = it }, label = { Text("MCP-токен") },
                     singleLine = true, modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(pass, { pass = it }, label = { Text("Passphrase (E2EE)") },
+                OutlinedTextField(pass, { pass = it }, label = { Text("Passphrase (из плагина VaultSync)") },
                     singleLine = true, modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(salt, { salt = it }, label = { Text("Salt (base64)") },
+                OutlinedTextField(salt, { salt = it }, label = { Text("Salt (из плагина VaultSync)") },
                     singleLine = true, modifier = Modifier.fillMaxWidth())
                 Button(
                     onClick = {
