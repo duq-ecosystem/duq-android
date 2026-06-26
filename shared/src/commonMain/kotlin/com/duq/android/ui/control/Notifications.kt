@@ -24,11 +24,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.duq.android.data.SettingsRepository
 import com.duq.android.ui.AppUpdateController
 import com.duq.android.ui.DeepLinkState
 import com.duq.android.ui.NotificationInbox
 import com.duq.android.ui.theme.DuqColors
 import kotlinx.coroutines.launch
+import org.koin.compose.koinInject
 import kotlinx.datetime.Instant
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
@@ -39,6 +41,7 @@ object AppChrome {
     var showNotifications by mutableStateOf(false)
     var notificationsTab by mutableStateOf(0) // 0 = Уведомления, 1 = Дайджесты
     var openSettings: () -> Unit = {}
+    var openProfile: () -> Unit = {}   // профиль — с любого экрана через аватар в топбаре
 
     fun openShade(tab: Int = 0) { notificationsTab = tab; showNotifications = true }
 }
@@ -72,9 +75,25 @@ class NotificationsViewModel(
 
 /** Правый блок верхней панели — общий для ВСЕХ экранов: 🔔(бейдж) + ⚙️. */
 @Composable
-fun GlobalTopActions(vm: NotificationsViewModel = koinViewModel()) {
+fun GlobalTopActions(
+    vm: NotificationsViewModel = koinViewModel(),
+    settings: SettingsRepository = koinInject(),
+) {
     val unread by vm.unread.collectAsState()
+    val initial = settings.getUserName().trim().firstOrNull()?.uppercase() ?: "?"
     Row(verticalAlignment = Alignment.CenterVertically) {
+        // Профиль — аватар с инициалом юзера (best-practice вход в аккаунт с топбара, не из Настроек).
+        Box(
+            modifier = Modifier.size(44.dp).clip(CircleShape).clickable { AppChrome.openProfile() },
+            contentAlignment = Alignment.Center
+        ) {
+            Box(
+                modifier = Modifier.size(30.dp).clip(CircleShape).background(DuqColors.primary),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(initial, fontSize = 14.sp, color = Color.Black, fontWeight = FontWeight.Bold)
+            }
+        }
         Box(
             modifier = Modifier.size(44.dp).clip(CircleShape)
                 .clickable { vm.refresh(); AppChrome.openShade(0) },

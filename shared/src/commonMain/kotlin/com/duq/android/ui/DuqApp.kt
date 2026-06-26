@@ -96,6 +96,7 @@ fun DuqApp(
     // AppChrome.openSettings не остаётся ссылка на старый (detached) navController.
     SideEffect {
         AppChrome.openSettings = { navController.navigate(Screen.Settings.route) }
+        AppChrome.openProfile = { navController.navigate(Screen.Profile.route) }
     }
 
     NavHost(navController = navController, startDestination = Screen.Shell.route) {
@@ -108,7 +109,6 @@ fun DuqApp(
         composable(Screen.Settings.route) {
             SettingsScreen(
                 onBack = { navController.popBackStack() },
-                onOpenProfile = { navController.navigate(Screen.Profile.route) },
             )
         }
         composable(Screen.Profile.route) {

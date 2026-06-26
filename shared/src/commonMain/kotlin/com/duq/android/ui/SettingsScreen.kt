@@ -17,7 +17,6 @@ import kotlin.math.roundToInt
 @Composable
 fun SettingsScreen(
     onBack: () -> Unit,
-    onOpenProfile: () -> Unit = {},
     repo: SettingsRepository = koinInject(),
 ) {
     var silenceTimeout by remember { mutableFloatStateOf(repo.getSilenceTimeoutMsSync().toFloat()) }
@@ -34,10 +33,7 @@ fun SettingsScreen(
             modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp).verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Button(onClick = onOpenProfile, modifier = Modifier.fillMaxWidth()) {
-                Text("Профиль и интеграции")
-            }
-
+            // Профиль/интеграции вынесены на верхний уровень — аватар в топбаре (AppChrome.openProfile).
             Text("Голос", style = MaterialTheme.typography.titleMedium)
 
             Text("Таймаут тишины: ${(silenceTimeout / 1000).roundToInt()}с")

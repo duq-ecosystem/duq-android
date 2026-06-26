@@ -55,6 +55,8 @@ data class RegisterResponse(
 @Serializable
 data class IntegrationsResponse(
     @SerialName("user_id") val userId: String = "",
+    val name: String = "",
+    val role: String = "",
     val integrations: IntegrationsStatus = IntegrationsStatus()
 )
 
