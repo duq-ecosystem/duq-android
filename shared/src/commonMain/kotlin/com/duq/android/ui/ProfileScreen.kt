@@ -2,6 +2,8 @@ package com.duq.android.ui
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -11,48 +13,63 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.outlined.CloudOff
+import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.Mail
+import androidx.compose.material.icons.outlined.PersonAdd
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.duq.android.data.Account
 import com.duq.android.data.SettingsRepository
 import com.duq.android.network.duq.DuqRestClient
+import com.duq.android.network.duq.FamilyMember
 import com.duq.android.network.duq.IntegrationsResponse
 import com.duq.android.ui.theme.DuqColors
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 
 /**
- * Профиль пользователя (мультиюзер). Best-practice место — отдельный экран с верхнего уровня
- * (аватар в топбаре), НЕ из Настроек. Шапка: аватар + имя + роль. Ниже — редактирование имени и
- * карточки интеграций (Obsidian-волт со своей E2EE-формой, Google). Личность по user_id, токен
- * общий на семью. См. Multi-User-Architecture.
+ * Профиль/аккаунт (мультиаккаунт). Показывает, под кем ты вошёл; даёт переключаться между
+ * сохранёнными на устройстве аккаунтами (вход по имени+токену), войти под другим, удалить
+ * аккаунт с устройства. Для admin — список ВСЕХ зареганых членов семьи. Плюс редактирование
+ * имени и карточки интеграций. См. Multi-User-Architecture.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileScreen(
     onBack: () -> Unit,
+    onSwitched: () -> Unit,        // переключили активный аккаунт → DuqApp перезагрузит как нового
+    onAddAccount: () -> Unit,      // «войти под другим» → экран входа
     rest: DuqRestClient = koinInject(),
     repo: SettingsRepository = koinInject(),
 ) {
     val scope = rememberCoroutineScope()
-    var name by remember { mutableStateOf(repo.getUserName()) }
-    val userId = remember { repo.getUserId() }
+    val activeId = remember { repo.getUserId() }
+    val savedName = remember { repo.getUserName() }
+    var name by remember { mutableStateOf(savedName) }
     var info by remember { mutableStateOf(IntegrationsResponse()) }
+    var accounts by remember { mutableStateOf(repo.getAccounts()) }
+    var members by remember { mutableStateOf<List<FamilyMember>>(emptyList()) }
     var status by remember { mutableStateOf("") }
 
-    suspend fun reload() { runCatching { info = rest.integrations() }.onSuccess {
-        if (name.isBlank() && info.name.isNotBlank()) name = info.name
-    } }
+    suspend fun reload() {
+        runCatching { info = rest.integrations() }
+        runCatching { members = rest.familyMembers() }   // пусто если не admin
+        accounts = repo.getAccounts()
+    }
     LaunchedEffect(Unit) { reload() }
+
+    val role = info.role.ifBlank { repo.getUserRole() }
+    val isAdmin = role == "admin" || role == "root"
 
     Scaffold(
         containerColor = DuqColors.background,
@@ -72,78 +89,86 @@ fun ProfileScreen(
                 .padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp),
         ) {
-            // ───────── Шапка: аватар + имя + роль ─────────
+            // ───────── Шапка: вы вошли как ─────────
             Column(
                 modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(10.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Box(
-                    modifier = Modifier.size(80.dp).clip(CircleShape).background(DuqColors.primary),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(
-                        name.trim().firstOrNull()?.uppercase() ?: "?",
-                        fontSize = 34.sp, fontWeight = FontWeight.Bold,
-                        color = androidx.compose.ui.graphics.Color.Black,
-                    )
+                Avatar(name, 80.dp, 34.sp)
+                Text("Вы вошли как", style = MaterialTheme.typography.bodySmall, color = DuqColors.textDim)
+                Text(name.ifBlank { "Без имени" }, style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.SemiBold)
+                RoleBadge(role)
+            }
+
+            // ───────── Имя (Сохранить только при изменении) ─────────
+            SectionCard {
+                Text("Имя", style = MaterialTheme.typography.titleSmall, color = DuqColors.textSecondary)
+                OutlinedTextField(name, { name = it }, singleLine = true,
+                    modifier = Modifier.fillMaxWidth())
+                AnimatedVisibility(name.trim().isNotBlank() && name.trim() != savedName) {
+                    Button(
+                        onClick = {
+                            scope.launch {
+                                status = runCatching { rest.updateProfile(name.trim()); reload(); "Сохранено" }
+                                    .getOrElse { "Ошибка: ${it.message}" }
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) { Text("Сохранить") }
                 }
-                Text(
-                    name.ifBlank { "Без имени" },
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                RoleBadge(info.role)
-                if (userId.isNotBlank()) {
-                    Text("ID ${userId.take(8)}", style = MaterialTheme.typography.bodySmall,
-                        color = DuqColors.textDim)
+                if (status.isNotBlank()) {
+                    Text(status, style = MaterialTheme.typography.bodySmall, color = DuqColors.textDim)
                 }
             }
 
-            // ───────── Имя ─────────
-            SectionCard {
-                Text("Имя", style = MaterialTheme.typography.titleSmall, color = DuqColors.textSecondary)
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
+            // ───────── Аккаунты на устройстве (переключение) ─────────
+            Text("Аккаунты на устройстве", style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(start = 4.dp))
+            accounts.forEach { acc ->
+                AccountRow(
+                    acc = acc,
+                    active = acc.userId == activeId,
+                    onSwitch = { repo.setActiveUser(acc.userId); onSwitched() },
+                    onRemove = { repo.removeAccount(acc.userId); accounts = repo.getAccounts() },
                 )
-                Button(
-                    onClick = {
-                        repo.saveUserName(name.trim())
-                        scope.launch {
-                            status = runCatching {
-                                if (userId.isBlank()) rest.ensureRegistered(name.trim().ifBlank { null })
-                                else rest.updateProfile(name.trim())
-                                reload(); "Сохранено"
-                            }.getOrElse { "Ошибка: ${it.message}" }
-                        }
-                    },
-                    enabled = name.isNotBlank(),
-                    modifier = Modifier.fillMaxWidth(),
-                ) { Text("Сохранить") }
-                if (status.isNotBlank()) {
-                    Text(status, style = MaterialTheme.typography.bodySmall, color = DuqColors.textDim)
+            }
+            OutlinedButton(onClick = onAddAccount, modifier = Modifier.fillMaxWidth()) {
+                Icon(Icons.Outlined.PersonAdd, null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("Войти под другим")
+            }
+
+            // ───────── Все пользователи (только admin) ─────────
+            if (isAdmin && members.isNotEmpty()) {
+                Text("Все пользователи (админ)", style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.padding(start = 4.dp))
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    members.forEach { m -> MemberRow(m) }
                 }
             }
 
             // ───────── Интеграции ─────────
             Text("Интеграции", style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.padding(start = 4.dp))
-
-            ObsidianCard(connected = info.integrations.obsidian, onLinked = { scope.launch { reload() } },
-                rest = rest)
-
-            IntegrationCard(
-                icon = Icons.Outlined.Mail,
-                title = "Google",
-                subtitle = "Почта и календарь",
-                connected = info.integrations.google,
-            )
+            ObsidianCard(connected = info.integrations.obsidian, rest = rest,
+                onLinked = { scope.launch { reload() } })
+            IntegrationCard(Icons.Outlined.Mail, "Google", "Почта и календарь", info.integrations.google)
 
             Spacer(Modifier.height(8.dp))
         }
+    }
+}
+
+@Composable
+private fun Avatar(name: String, size: androidx.compose.ui.unit.Dp, fontSize: androidx.compose.ui.unit.TextUnit) {
+    Box(
+        modifier = Modifier.size(size).clip(CircleShape).background(DuqColors.primary),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(name.trim().firstOrNull()?.uppercase() ?: "?", fontSize = fontSize,
+            fontWeight = FontWeight.Bold, color = Color.Black)
     }
 }
 
@@ -163,6 +188,51 @@ private fun RoleBadge(role: String) {
     }
 }
 
+/** Строка сохранённого аккаунта: тап = переключиться; активный отмечен; корзина = убрать с устройства. */
+@Composable
+private fun AccountRow(acc: Account, active: Boolean, onSwitch: () -> Unit, onRemove: () -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp))
+            .background(DuqColors.surfaceVariant)
+            .then(if (active) Modifier.border(1.dp, DuqColors.primary, RoundedCornerShape(16.dp)) else Modifier)
+            .clickable(enabled = !active, onClick = onSwitch)
+            .padding(14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Avatar(acc.name, 36.dp, 15.sp)
+        Column(Modifier.weight(1f)) {
+            Text(acc.name.ifBlank { "Без имени" }, style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Medium)
+            Text(if (acc.role == "admin" || acc.role == "root") "Администратор" else "Пользователь",
+                style = MaterialTheme.typography.bodySmall, color = DuqColors.textDim)
+        }
+        if (active) {
+            Icon(Icons.Filled.CheckCircle, "активен", tint = DuqColors.primary, modifier = Modifier.size(20.dp))
+        } else {
+            IconButton(onClick = onRemove) {
+                Icon(Icons.Outlined.Delete, "Убрать", tint = DuqColors.textDim, modifier = Modifier.size(20.dp))
+            }
+        }
+    }
+}
+
+@Composable
+private fun MemberRow(m: FamilyMember) {
+    Row(
+        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
+            .background(DuqColors.surfaceVariant).padding(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Avatar(m.name, 32.dp, 13.sp)
+        Text(m.name.ifBlank { "Без имени" }, style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.weight(1f))
+        Text(if (m.role == "admin" || m.role == "root") "админ" else "юзер",
+            style = MaterialTheme.typography.labelMedium, color = DuqColors.textDim)
+    }
+}
+
 @Composable
 private fun SectionCard(content: @Composable ColumnScope.() -> Unit) {
     Column(
@@ -173,7 +243,6 @@ private fun SectionCard(content: @Composable ColumnScope.() -> Unit) {
     )
 }
 
-/** Карточка интеграции: иконка + название + статус-чип. */
 @Composable
 private fun IntegrationCard(icon: ImageVector, title: String, subtitle: String, connected: Boolean) {
     Row(
@@ -182,8 +251,7 @@ private fun IntegrationCard(icon: ImageVector, title: String, subtitle: String, 
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        Icon(icon, contentDescription = title, tint = DuqColors.textSecondary,
-            modifier = Modifier.size(26.dp))
+        Icon(icon, contentDescription = title, tint = DuqColors.textSecondary, modifier = Modifier.size(26.dp))
         Column(Modifier.weight(1f)) {
             Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Medium)
             Text(subtitle, style = MaterialTheme.typography.bodySmall, color = DuqColors.textDim)
@@ -194,22 +262,14 @@ private fun IntegrationCard(icon: ImageVector, title: String, subtitle: String, 
 
 @Composable
 private fun StatusChip(connected: Boolean) {
-    if (connected) {
-        Row(verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            Icon(Icons.Filled.CheckCircle, null, tint = DuqColors.primary, modifier = Modifier.size(16.dp))
-            Text("подключено", style = MaterialTheme.typography.labelMedium, color = DuqColors.primary)
-        }
-    } else {
-        Row(verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            Icon(Icons.Outlined.CloudOff, null, tint = DuqColors.textDim, modifier = Modifier.size(16.dp))
-            Text("не подключено", style = MaterialTheme.typography.labelMedium, color = DuqColors.textDim)
-        }
+    val (txt, col, icn) = if (connected) Triple("подключено", DuqColors.primary, Icons.Filled.CheckCircle)
+    else Triple("не подключено", DuqColors.textDim, Icons.Outlined.CloudOff)
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        Icon(icn, null, tint = col, modifier = Modifier.size(16.dp))
+        Text(txt, style = MaterialTheme.typography.labelMedium, color = col)
     }
 }
 
-/** Карточка Obsidian-волта: статус + раскрывающаяся форма привязки своего E2EE-волта. */
 @Composable
 private fun ObsidianCard(connected: Boolean, onLinked: () -> Unit, rest: DuqRestClient) {
     val scope = rememberCoroutineScope()
@@ -230,13 +290,10 @@ private fun ObsidianCard(connected: Boolean, onLinked: () -> Unit, rest: DuqRest
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            Icon(Icons.Outlined.Folder, "Obsidian", tint = DuqColors.textSecondary,
-                modifier = Modifier.size(26.dp))
+            Icon(Icons.Outlined.Folder, "Obsidian", tint = DuqColors.textSecondary, modifier = Modifier.size(26.dp))
             Column(Modifier.weight(1f)) {
-                Text("Obsidian-волт", style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Medium)
-                Text("Свой E2EE-волт через vault-sync", style = MaterialTheme.typography.bodySmall,
-                    color = DuqColors.textDim)
+                Text("Obsidian-волт", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Medium)
+                Text("Свой E2EE-волт через vault-sync", style = MaterialTheme.typography.bodySmall, color = DuqColors.textDim)
             }
             StatusChip(connected)
         }
@@ -257,8 +314,7 @@ private fun ObsidianCard(connected: Boolean, onLinked: () -> Unit, rest: DuqRest
                     onClick = {
                         scope.launch {
                             err = runCatching {
-                                rest.linkObsidian(url.trim(), pass, salt.trim(),
-                                    token.trim().ifBlank { null })
+                                rest.linkObsidian(url.trim(), pass, salt.trim(), token.trim().ifBlank { null })
                                 expanded = false; onLinked(); ""
                             }.getOrElse { "Ошибка: ${it.message}" }
                         }

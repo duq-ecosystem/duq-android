@@ -3,6 +3,8 @@ package com.duq.android.ui
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -25,16 +27,26 @@ import org.koin.compose.koinInject
 @Composable
 fun RegistrationScreen(
     onRegistered: () -> Unit,
+    onBack: (() -> Unit)? = null,   // не-null = «войти под другим» поверх профиля (показать назад)
     rest: DuqRestClient = koinInject(),
     repo: SettingsRepository = koinInject(),
 ) {
     val scope = rememberCoroutineScope()
-    var name by remember { mutableStateOf(repo.getUserName()) }
+    var name by remember { mutableStateOf("") }
     var token by remember { mutableStateOf(repo.getServerToken()) }
     var status by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
 
-    Scaffold(topBar = { TopAppBar(title = { Text("Регистрация в DUQ") }) }) { padding ->
+    Scaffold(topBar = {
+        TopAppBar(
+            title = { Text("Вход в DUQ") },
+            navigationIcon = {
+                if (onBack != null) IconButton(onClick = onBack) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Назад")
+                }
+            },
+        )
+    }) { padding ->
         Column(
             modifier = Modifier.padding(padding).padding(24.dp).fillMaxSize()
                 .verticalScroll(rememberScrollState()),
@@ -42,7 +54,8 @@ fun RegistrationScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Text(
-                "Первый вход. Введи своё имя и общий токен системы (его даёт владелец).",
+                "Введи своё имя и общий токен системы (его даёт владелец). Есть такой член семьи — " +
+                    "войдёшь в него, нет — заведётся новый.",
                 style = MaterialTheme.typography.bodyMedium,
                 textAlign = TextAlign.Center,
             )
@@ -64,10 +77,9 @@ fun RegistrationScreen(
                 onClick = {
                     busy = true
                     repo.saveServerToken(token.trim())
-                    repo.saveUserName(name.trim())
                     scope.launch {
                         status = runCatching {
-                            rest.ensureRegistered(name.trim().ifBlank { null })
+                            rest.login(name.trim())
                         }.fold(
                             onSuccess = { onRegistered(); "" },
                             onFailure = { busy = false; "Ошибка: ${it.message}" },
@@ -76,7 +88,7 @@ fun RegistrationScreen(
                 },
                 enabled = !busy && name.isNotBlank() && token.isNotBlank(),
                 modifier = Modifier.fillMaxWidth(),
-            ) { Text(if (busy) "Регистрирую…" else "Зарегистрироваться") }
+            ) { Text(if (busy) "Вхожу…" else "Войти") }
 
             if (status.isNotBlank()) {
                 Text(status, color = MaterialTheme.colorScheme.error,

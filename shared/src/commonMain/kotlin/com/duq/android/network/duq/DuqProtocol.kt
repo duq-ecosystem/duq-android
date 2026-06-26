@@ -48,7 +48,22 @@ data class RegisterRequest(
 @Serializable
 data class RegisterResponse(
     val success: Boolean = false,
-    @SerialName("user_id") val userId: String? = null
+    @SerialName("user_id") val userId: String? = null,
+    val name: String = "",
+    val role: String = ""
+)
+
+/** Член семьи (для admin-списка всех зареганых, GET /api/family/members). */
+@Serializable
+data class FamilyMember(
+    @SerialName("user_id") val userId: String = "",
+    val name: String = "",
+    val role: String = ""
+)
+
+@Serializable
+data class FamilyMembersResponse(
+    val members: List<FamilyMember> = emptyList()
 )
 
 /** Статусы интеграций юзера (GET /api/integrations?user_id=). */

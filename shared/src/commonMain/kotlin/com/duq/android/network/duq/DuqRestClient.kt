@@ -31,26 +31,33 @@ class DuqRestClient(
     private fun url(path: String) = AppConfig.DUQ_API_BASE_URL + path
     private val bearer get() = "Bearer ${AppConfig.SERVER_TOKEN}"
 
-    // Сериализует регистрацию: без него два конкурентных вызова (LaunchedEffect старта +
-    // повторная композиция) оба видят пустой user_id и дважды POST'ят → дубль юзера в БД.
+    // Сериализует вход: без него два конкурентных вызова могли бы оба POST'нуть.
     private val regMutex = Mutex()
 
     /**
-     * Мультиюзер: гарантирует, что у устройства есть персональный user_id. Нет → регистрирует
-     * члена семьи (POST /api/auth/register method=app) и сохраняет user_id локально. Идемпотентно
-     * (под Mutex: второй конкурентный вызов после первого уже видит сохранённый user_id).
+     * Вход/регистрация по ИМЕНИ (+ общий токен уже в X-Auth-Token). Ядро: член семьи с таким
+     * именем есть → ВХОД (его user_id); нет → регистрация нового (первый = admin). Аккаунт
+     * (user_id/имя/роль) сохраняется на устройстве и становится активным — мультиаккаунт.
      */
-    suspend fun ensureRegistered(name: String? = null): String = regMutex.withLock {
-        settings.getUserId().takeIf { it.isNotBlank() }?.let { return@withLock it }
+    suspend fun login(name: String): String = regMutex.withLock {
         val resp = client.post(url("auth/register")) {
             contentType(ContentType.Application.Json)
-            setBody(RegisterRequest(name = name ?: settings.getUserName().ifBlank { null }))
+            setBody(RegisterRequest(name = name))
         }
-        if (!resp.status.isSuccess()) throw DuqApiException("register ${resp.status}")
-        val uid = resp.body<RegisterResponse>().userId
-            ?: throw DuqApiException("register: no user_id")
-        settings.saveUserId(uid)
+        if (!resp.status.isSuccess()) throw DuqApiException("login ${resp.status}")
+        val r = resp.body<RegisterResponse>()
+        val uid = r.userId ?: throw DuqApiException("login: no user_id")
+        settings.upsertActiveAccount(uid, r.name.ifBlank { name }, r.role)
         uid
+    }
+
+    /** Все члены семьи — ТОЛЬКО для admin (для секции «все пользователи» в профиле). */
+    suspend fun familyMembers(): List<FamilyMember> {
+        val uid = settings.getUserId()
+        if (uid.isBlank()) return emptyList()
+        val resp = client.get(url("family/members") + "?user_id=$uid")
+        if (!resp.status.isSuccess()) return emptyList()  // не admin → 403, просто пусто
+        return resp.body<FamilyMembersResponse>().members
     }
 
     /** Обновить имя уже зарегистрированного юзера (панель «Сохранить»; ensureRegistered тут
@@ -63,6 +70,7 @@ class DuqRestClient(
             setBody(ProfileUpdateRequest(uid, name))
         }
         if (!resp.status.isSuccess()) throw DuqApiException("profile ${resp.status}")
+        settings.renameActive(name)
     }
 
     /** Статусы интеграций юзера (google/obsidian) для панели профиля. */

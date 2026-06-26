@@ -40,7 +40,8 @@ import org.koin.compose.koinInject
 sealed class Screen(val route: String) {
     object Shell : Screen("shell")       // bottom-nav оболочка (Чат/Пульт)
     object Settings : Screen("settings")
-    object Profile : Screen("profile")   // панель пользователя (мультиюзер: имя + интеграции)
+    object Profile : Screen("profile")   // профиль/аккаунты (переключение, admin-список)
+    object Login : Screen("login")       // «войти под другим» поверх профиля
 }
 
 /** Вкладки нижней навигации. */
@@ -81,12 +82,12 @@ fun DuqApp(
     // release() на disposal (release необратим — навигация/рекомпозиция убила бы аудио).
     LaunchedEffect(Unit) { audioPlaybackManager.initialize() }
 
-    // Мультиюзер, гейт ПЕРВОГО входа (решение Дениса: никакой авто-регистрации). Нет user_id →
-    // экран регистрации (имя + общий токен системы). Зарегистрировался → дальше в приложение.
-    // Первый зарегистрированный = admin, последующие = public (роль ставит ядро).
-    var registered by remember { mutableStateOf(settings.getUserId().isNotBlank()) }
-    if (!registered) {
-        RegistrationScreen(onRegistered = { registered = true })
+    // Мультиаккаунт. Гейт: нет активного аккаунта → экран входа (имя + общий токен). Вход/
+    // переключение меняет activeUser → ниже всё (включая чат-VM) пересоздаётся по key(activeUser),
+    // чтобы данные были нового юзера. Никакой авто-регистрации.
+    var activeUser by remember { mutableStateOf(settings.getUserId()) }
+    if (activeUser.isBlank()) {
+        RegistrationScreen(onRegistered = { activeUser = settings.getUserId() })
         return
     }
 
@@ -101,10 +102,13 @@ fun DuqApp(
 
     NavHost(navController = navController, startDestination = Screen.Shell.route) {
         composable(Screen.Shell.route) {
-            MainShell(
-                audioPlaybackManager = audioPlaybackManager,
-                onNavigateToSettings = { navController.navigate(Screen.Settings.route) }
-            )
+            // key(activeUser): смена аккаунта пересоздаёт оболочку и чат-VM → данные нового юзера.
+            key(activeUser) {
+                MainShell(
+                    audioPlaybackManager = audioPlaybackManager,
+                    onNavigateToSettings = { navController.navigate(Screen.Settings.route) }
+                )
+            }
         }
         composable(Screen.Settings.route) {
             SettingsScreen(
@@ -112,7 +116,23 @@ fun DuqApp(
             )
         }
         composable(Screen.Profile.route) {
-            ProfileScreen(onBack = { navController.popBackStack() })
+            ProfileScreen(
+                onBack = { navController.popBackStack() },
+                onSwitched = {
+                    activeUser = settings.getUserId()
+                    navController.popBackStack(Screen.Shell.route, inclusive = false)
+                },
+                onAddAccount = { navController.navigate(Screen.Login.route) },
+            )
+        }
+        composable(Screen.Login.route) {
+            RegistrationScreen(
+                onRegistered = {
+                    activeUser = settings.getUserId()
+                    navController.popBackStack(Screen.Shell.route, inclusive = false)
+                },
+                onBack = { navController.popBackStack() },
+            )
         }
     }
 

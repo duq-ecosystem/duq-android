@@ -1,10 +1,18 @@
 package com.duq.android.data
 
+import com.duq.android.network.duqJson
 import com.russhwolf.settings.Settings
 import com.russhwolf.settings.get
 import com.russhwolf.settings.set
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.encodeToString
+
+/** Аккаунт, сохранённый на устройстве (мультиаккаунт): под кем уже заходили. */
+@Serializable
+data class Account(val userId: String, val name: String, val role: String = "")
 
 /**
  * KMP-хранилище настроек на multiplatform-settings (com.russhwolf:multiplatform-settings),
@@ -28,8 +36,8 @@ class SettingsRepository(private val settings: Settings) {
         private const val KEY_WAKE_WORD_SENSITIVITY = "wake_word_sensitivity"
         private const val KEY_SILENCE_TIMEOUT_MS = "silence_timeout_ms"
         private const val KEY_LAST_REPORTED_LOCATION = "last_reported_location"
-        private const val KEY_USER_ID = "duq_user_id"
-        private const val KEY_USER_NAME = "duq_user_name"
+        private const val KEY_ACCOUNTS = "duq_accounts"        // мультиаккаунт: список сохранённых
+        private const val KEY_ACTIVE_USER = "duq_active_user"   // активный user_id
         private const val KEY_SERVER_TOKEN = "duq_server_token"
 
         const val DEFAULT_WAKE_WORD_SENSITIVITY = 0.9f
@@ -39,13 +47,61 @@ class SettingsRepository(private val settings: Settings) {
     // Авторизация устройства — build-time edge-token (BuildConfig.SERVER_TOKEN), не
     // per-device пейринг. Поля device/node/bootstrap/gateway (Ed25519/legacy) удалены.
 
-    // Мультиюзер: персональный user_id (UUID) этого устройства, выдан ядром при регистрации
-    // (POST /api/auth/register method=app). Шлётся в каждом сообщении → ядро различает членов
-    // семьи поверх общего edge-токена. Пусто = ещё не зарегистрирован.
-    fun getUserId(): String = settings[KEY_USER_ID, ""]
-    fun saveUserId(id: String) { settings[KEY_USER_ID] = id }
-    fun getUserName(): String = settings[KEY_USER_NAME, ""]
-    fun saveUserName(name: String) { settings[KEY_USER_NAME] = name }
+    // ───────── Мультиаккаунт (вход по имени + общий токен; устройство помнит всех) ─────────
+    // user_id (UUID) активного аккаунта шлётся в каждом запросе → ядро различает членов семьи
+    // поверх общего edge-токена. Список аккаунтов хранится на устройстве, «Выход» = переключение
+    // (не стирает), плюс «войти под другим» и удаление аккаунта с устройства.
+
+    private fun loadAccounts(): MutableList<Account> =
+        runCatching { duqJson.decodeFromString<List<Account>>(settings[KEY_ACCOUNTS, "[]"]) }
+            .getOrElse { emptyList() }.toMutableList()
+
+    private fun storeAccounts(list: List<Account>) {
+        settings[KEY_ACCOUNTS] = duqJson.encodeToString(list)
+    }
+
+    /** Все сохранённые на устройстве аккаунты (под кем заходили). */
+    fun getAccounts(): List<Account> = loadAccounts()
+
+    /** Активный user_id (пусто = ни одного аккаунта, показываем экран входа). */
+    fun getUserId(): String = settings[KEY_ACTIVE_USER, ""]
+
+    /** Имя активного аккаунта. */
+    fun getUserName(): String =
+        loadAccounts().firstOrNull { it.userId == getUserId() }?.name ?: ""
+
+    /** Роль активного аккаунта (admin/public). */
+    fun getUserRole(): String =
+        loadAccounts().firstOrNull { it.userId == getUserId() }?.role ?: ""
+
+    /** Вход/регистрация: добавить (или обновить) аккаунт и сделать его активным. */
+    fun upsertActiveAccount(userId: String, name: String, role: String) {
+        val list = loadAccounts()
+        val i = list.indexOfFirst { it.userId == userId }
+        if (i >= 0) list[i] = Account(userId, name, role) else list.add(Account(userId, name, role))
+        storeAccounts(list)
+        settings[KEY_ACTIVE_USER] = userId
+    }
+
+    /** Переключить активный аккаунт на уже сохранённый (без повторного входа/токена). */
+    fun setActiveUser(userId: String) {
+        if (loadAccounts().any { it.userId == userId }) settings[KEY_ACTIVE_USER] = userId
+    }
+
+    /** Убрать аккаунт с устройства (реальное удаление из списка). */
+    fun removeAccount(userId: String) {
+        val list = loadAccounts().filterNot { it.userId == userId }
+        storeAccounts(list)
+        if (getUserId() == userId) settings[KEY_ACTIVE_USER] = list.firstOrNull()?.userId ?: ""
+    }
+
+    /** Переименование активного аккаунта (после updateProfile на ядре). */
+    fun renameActive(name: String) {
+        val uid = getUserId()
+        val list = loadAccounts()
+        val i = list.indexOfFirst { it.userId == uid }
+        if (i >= 0) { list[i] = list[i].copy(name = name); storeAccounts(list) }
+    }
 
     // Общий токен системы (edge-token семьи), вводится юзером на экране регистрации при первом
     // входе — НЕ зашит в билд. Идёт в X-Auth-Token на всех запросах (см. DuqHttpClient).
