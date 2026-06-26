@@ -21,6 +21,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Send
 import androidx.compose.material.icons.outlined.Mic
+import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Stop
 import androidx.compose.material3.CircularProgressIndicator
@@ -54,6 +55,7 @@ import com.duq.android.audio.PlaybackState
 import com.duq.android.ui.components.DuqDuck
 import com.duq.android.ui.components.MessagesList
 import com.duq.android.ui.control.GlobalTopActions
+import com.duq.android.ui.control.ProfileAvatar
 import com.duq.android.ui.theme.DuqColors
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.hazeSource
@@ -295,30 +297,17 @@ fun MainScreen(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Conversation title (clickable to open the conversation switcher)
-            Row(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(8.dp))
-                    .clickable {
-                        viewModel.loadConversations()  // освежить список бесед перед показом
-                        viewModel.loadAgents()          // и список агентов — иначе созданный
-                        // позже агент не подхватится и переключатель (size>1) не появится
-                        showConversationPicker = true
-                    }
-                    .padding(8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
+            // Слева — профиль (best-practice: аккаунт вверху слева) + заголовок беседы.
+            // Переключатель сессий уехал ВНИЗ к полю ввода (иконка в thumb-зоне).
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                ProfileAvatar()
+                Spacer(modifier = Modifier.width(12.dp))
                 Text(
                     text = activeConversationTitle,
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Medium,
                     color = DuqColors.textPrimary,
                     maxLines = 1
-                )
-                Text(
-                    text = " ▼",
-                    fontSize = 12.sp,
-                    color = DuqColors.textSecondary
                 )
             }
 
@@ -369,6 +358,24 @@ fun MainScreen(
                     .padding(horizontal = 12.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                // Сессии (история бесед) — в нижней thumb-зоне, слева от поля. Открывает
+                // переключатель бесед (раньше висел в шапке как «заголовок ▼»).
+                Box(
+                    modifier = Modifier
+                        .size(44.dp)
+                        .clip(CircleShape)
+                        .background(DuqColors.surfaceVariant)
+                        .clickable {
+                            viewModel.loadConversations()
+                            viewModel.loadAgents()
+                            showConversationPicker = true
+                        },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(Icons.Outlined.History, contentDescription = "Сессии",
+                        tint = DuqColors.textSecondary, modifier = Modifier.size(22.dp))
+                }
+                Spacer(modifier = Modifier.width(8.dp))
                 OutlinedTextField(
                     value = textInput,
                     onValueChange = { textInput = it },

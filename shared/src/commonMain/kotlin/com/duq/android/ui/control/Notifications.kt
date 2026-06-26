@@ -73,27 +73,29 @@ class NotificationsViewModel(
     }
 }
 
+/**
+ * Профиль — аватар с инициалом юзера. Best-practice 2026: аккаунт вверху СЛЕВА, на видном месте
+ * (не прятать в Настройки/меню). Тап → ProfileScreen. Ставится в шапку Чата и Пульта.
+ */
+@Composable
+fun ProfileAvatar(settings: SettingsRepository = koinInject()) {
+    val initial = settings.getUserName().trim().firstOrNull()?.uppercase() ?: "?"
+    Box(
+        modifier = Modifier.size(40.dp).clip(CircleShape).background(DuqColors.primary)
+            .clickable { AppChrome.openProfile() },
+        contentAlignment = Alignment.Center
+    ) {
+        Text(initial, fontSize = 16.sp, color = Color.Black, fontWeight = FontWeight.Bold)
+    }
+}
+
 /** Правый блок верхней панели — общий для ВСЕХ экранов: 🔔(бейдж) + ⚙️. */
 @Composable
 fun GlobalTopActions(
     vm: NotificationsViewModel = koinViewModel(),
-    settings: SettingsRepository = koinInject(),
 ) {
     val unread by vm.unread.collectAsState()
-    val initial = settings.getUserName().trim().firstOrNull()?.uppercase() ?: "?"
     Row(verticalAlignment = Alignment.CenterVertically) {
-        // Профиль — аватар с инициалом юзера (best-practice вход в аккаунт с топбара, не из Настроек).
-        Box(
-            modifier = Modifier.size(44.dp).clip(CircleShape).clickable { AppChrome.openProfile() },
-            contentAlignment = Alignment.Center
-        ) {
-            Box(
-                modifier = Modifier.size(30.dp).clip(CircleShape).background(DuqColors.primary),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(initial, fontSize = 14.sp, color = Color.Black, fontWeight = FontWeight.Bold)
-            }
-        }
         Box(
             modifier = Modifier.size(44.dp).clip(CircleShape)
                 .clickable { vm.refresh(); AppChrome.openShade(0) },

@@ -25,6 +25,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.duq.android.ui.control.GlobalTopActions
+import com.duq.android.ui.control.ProfileAvatar
 import com.duq.android.ui.theme.DuqColors
 
 /**
@@ -49,13 +50,17 @@ fun HubScreen(onOpenSection: (String) -> Unit, onOpenPalette: () -> Unit = {}) {
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = "ПУЛЬТ",
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Light,
-                color = DuqColors.textDim,
-                letterSpacing = 3.sp
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                ProfileAvatar()
+                Spacer(Modifier.width(12.dp))
+                Text(
+                    text = "ПУЛЬТ",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Light,
+                    color = DuqColors.textDim,
+                    letterSpacing = 3.sp
+                )
+            }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Outlined.Search, contentDescription = "Поиск", tint = DuqColors.textSecondary,
                     modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable(onClick = onOpenPalette).padding(8.dp).size(22.dp))
