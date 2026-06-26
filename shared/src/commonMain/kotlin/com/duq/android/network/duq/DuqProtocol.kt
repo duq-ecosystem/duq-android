@@ -1,5 +1,6 @@
 package com.duq.android.network.duq
 
+import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
@@ -31,7 +32,9 @@ data class MessageRequest(
 /** Регистрация члена семьи из приложения (POST /api/auth/register, method=app). */
 @Serializable
 data class RegisterRequest(
-    val method: String = "app",
+    // @EncodeDefault(ALWAYS): json настроен encodeDefaults=false, поэтому поле с дефолтным
+    // значением ("app") выкидывалось из тела → бэкенд получал method="" → 400. Форсим кодирование.
+    @EncodeDefault(EncodeDefault.Mode.ALWAYS) val method: String = "app",
     val name: String? = null
 )
 
