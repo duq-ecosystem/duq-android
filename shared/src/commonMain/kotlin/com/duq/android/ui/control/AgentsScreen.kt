@@ -157,7 +157,9 @@ private fun AgentSheet(
     val picked = remember(key) { mutableStateListOf<String>().apply { initial?.allowedTools?.let { addAll(it) } } }
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheet, containerColor = DuqColors.surfaceElevated) {
-        Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 28.dp)) {
+        // imePadding: при открытой клавиатуре поднимаем содержимое (включая зафиксированную
+        // снизу кнопку «Создать») НАД клавой — иначе она уезжала под неё и была недостижима.
+        Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 28.dp).imePadding()) {
             // Прокручиваемая часть (поля + длинный список тулов). Кнопка вынесена ИЗ
             // скролла и зафиксирована снизу — иначе при большом тулсете она уезжала за
             // экран и до неё было не докрутить.
