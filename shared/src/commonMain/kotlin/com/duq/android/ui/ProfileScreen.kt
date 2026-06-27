@@ -334,8 +334,8 @@ private fun ObsidianCard(connected: Boolean, onLinked: () -> Unit, rest: DuqRest
         AnimatedVisibility(expanded) {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(
-                    "На компьютере открой плагин Obsidian VaultSync → настройки → «Copy code for DUQ» " +
-                        "и вставь код сюда. Больше ничего вводить не нужно.",
+                    "В плагине Obsidian VaultSync (на компьютере или в телефоне) открой настройки → " +
+                        "«Copy code for DUQ» и вставь код сюда. Больше ничего вводить не нужно.",
                     style = MaterialTheme.typography.bodySmall, color = DuqColors.textDim,
                 )
                 OutlinedTextField(code, { code = it }, label = { Text("Код из плагина VaultSync") },
